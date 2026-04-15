@@ -439,7 +439,7 @@ body {
     <div class="sec-label" style="margin-top:12px">データ管理</div>
     <div class="setting-card danger-zone">
       <div style="padding:14px">
-        <button class="reset-btn" onclick="resetAllData()">⚠ すべてのデータをリセット</button>
+        <button class="reset-btn" onclick="resetAllData()">⚠ 今月の記帳履歴をリセット</button>
       </div>
     </div>
 
@@ -723,10 +723,12 @@ function saveApiKey(){
 }
 
 function resetAllData(){
-  if(!confirm('すべての記帳履歴・設定を削除します。この操作は元に戻せません。よろしいですか？')) return;
+  if(!confirm('今月の記帳履歴をすべて削除します。\n口座設定・APIキーは残ります。\nよろしいですか？')) return;
   if(!confirm('本当に削除してよいですか？')) return;
-  LS.del(KEY_WALLETS); LS.del(KEY_HISTORY); LS.del(KEY_API);
-  location.reload();
+  history = [];
+  LS.set(KEY_HISTORY, history);
+  renderHome(); renderHistory();
+  showToast('記帳履歴をリセットしました');
 }
 
 // ════════════════════════════════
