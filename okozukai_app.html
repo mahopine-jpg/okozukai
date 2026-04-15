@@ -242,9 +242,12 @@ body {
   width: 100%; background: var(--text); color: #fff; border: none;
   border-radius: 12px; font-family: var(--sans); font-size: 17px;
   font-weight: 900; padding: 16px; cursor: pointer; margin-top: 12px;
-  transition: opacity .15s;
+  transition: opacity .15s, background .2s;
 }
 .save-btn:active { opacity: .75; }
+.save-btn:disabled {
+  background: var(--border2); color: var(--muted); cursor: not-allowed; opacity: 1;
+}
 .api-row {
   padding: 14px; display: flex; flex-direction: column; gap: 8px;
 }
@@ -424,15 +427,15 @@ body {
       <div id="wallet-settings"></div>
     </div>
     <button class="add-wallet-btn" onclick="addWallet()">＋ 口座を追加</button>
-    <button class="save-btn" onclick="saveWallets()">口座設定を保存</button>
+    <button class="save-btn" id="save-wallets-btn" onclick="saveWallets()" disabled>口座設定を保存</button>
 
     <div class="sec-label" style="margin-top:12px">Claude API キー</div>
     <div class="setting-card">
       <div class="api-row">
         <div class="api-label">APIキーを入力すると集計画面でAI評価が使えます</div>
-        <input type="password" class="inp-api" id="inp-api" placeholder="sk-ant-...">
+        <input type="password" class="inp-api" id="inp-api" placeholder="sk-ant-..." oninput="markApiDirty()">
         <div class="api-note">キーはこのデバイス内にのみ保存されます。外部に送信されることはありません。</div>
-        <button class="save-btn" style="margin-top:4px" onclick="saveApiKey()">APIキーを保存</button>
+        <button class="save-btn" id="save-api-btn" style="margin-top:4px" onclick="saveApiKey()" disabled>APIキーを保存</button>
       </div>
     </div>
 
@@ -669,9 +672,9 @@ function renderSettings(){
     row.className = 'wallet-row';
     row.dataset.idx = i;
     row.innerHTML = `
-      <input class="inp-name" type="text" value="${w.name}" placeholder="口座名">
+      <input class="inp-name" type="text" value="${w.name}" placeholder="口座名" oninput="markWalletsDirty()">
       <span class="budget-yen">¥</span>
-      <input class="inp-budget" type="number" value="${w.budget}" placeholder="0" inputmode="numeric">
+      <input class="inp-budget" type="number" value="${w.budget}" placeholder="0" inputmode="numeric" oninput="markWalletsDirty()">
       <button class="del-btn" onclick="delWalletRow(${i})">×</button>`;
     c.appendChild(row);
   });
@@ -706,19 +709,25 @@ function saveWallets(){
   });
   wallets = newWallets;
   LS.set(KEY_WALLETS, wallets);
+  walletsDirty = false;
+  document.getElementById('save-wallets-btn').disabled = true;
   renderHome(); renderSelect(); renderSettings();
-  showToast('口座設定を保存しました');
+  showToast('✓ 口座設定を保存しました');
 }
 
 function saveApiKey(){
   const val = document.getElementById('inp-api').value.trim();
   if(val && !val.startsWith('●')){
     LS.set(KEY_API, val);
-    showToast('APIキーを保存しました');
+    apiDirty = false;
+    document.getElementById('save-api-btn').disabled = true;
     document.getElementById('inp-api').value = '●'.repeat(20);
+    showToast('✓ APIキーを保存しました');
   } else if(!val){
     LS.del(KEY_API);
-    showToast('APIキーを削除しました');
+    apiDirty = false;
+    document.getElementById('save-api-btn').disabled = true;
+    showToast('✓ APIキーを削除しました');
   }
 }
 
@@ -894,6 +903,15 @@ document.getElementById('panel-handle').onclick = () => panelOpen ? closePanel()
 //  Nav
 // ════════════════════════════════
 function showPage(id, tab){
+  if((walletsDirty || apiDirty) && currentPage === 'settings' && id !== 'settings'){
+    const leave = window.confirm('設定が保存されていません。\nこのまま移動すると変更が失われます。\n移動しますか？');
+    if(!leave) return;
+    walletsDirty = false;
+    apiDirty = false;
+    document.getElementById('save-wallets-btn').disabled = true;
+    document.getElementById('save-api-btn').disabled = true;
+  }
+  currentPage = id;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
@@ -911,6 +929,23 @@ function showToast(msg){
   const t = document.getElementById('toast');
   t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+// ════════════════════════════════
+//  Dirty flags
+// ════════════════════════════════
+let walletsDirty = false;
+let apiDirty     = false;
+let currentPage  = 'home';
+
+function markWalletsDirty(){
+  walletsDirty = true;
+  document.getElementById('save-wallets-btn').disabled = false;
+}
+function markApiDirty(){
+  apiDirty = true;
+  const val = document.getElementById('inp-api').value.trim();
+  document.getElementById('save-api-btn').disabled = !val;
 }
 
 // ════════════════════════════════
