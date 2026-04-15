@@ -472,6 +472,7 @@ body {
     <input type="number" class="inp-amount" id="inp-amount" placeholder="0" inputmode="numeric" oninput="checkAddBtn()" style="flex:1;min-width:0;width:100%">
   </div>
   <input type="text" class="inp-memo" id="inp-memo" placeholder="メモ（任意）">
+  <input type="date" class="inp-memo" id="inp-date" style="margin-bottom:10px">
   <button class="add-btn" id="add-tx-btn" onclick="addTx()" disabled>記帳する</button>
 </div>
 
@@ -596,7 +597,11 @@ function renderHistory(){
     c.innerHTML = '<div class="empty-msg">記帳はまだありません</div>';
     return;
   }
-  const sorted = [...history].sort((a,b)=>b.ts-a.ts);
+  const sorted = [...history].sort((a,b)=>{
+    const da = new Date(a.year, a.month-1, a.day);
+    const db = new Date(b.year, b.month-1, b.day);
+    return db - da || b.ts - a.ts;
+  });
   sorted.forEach(h => {
     const d = document.createElement('div');
     d.className = 'h-item';
@@ -610,6 +615,7 @@ function renderHistory(){
         <div class="h-amount">−¥${fmt(h.amount)}</div>
         <div style="display:flex;align-items:center;gap:6px">
           <div class="h-date">${h.year}/${dateStr}</div>
+          <button class="h-del" onclick="editTx('${h.id}',event)" title="編集">✎</button>
           <button class="h-del" onclick="deleteTx('${h.id}',event)" title="削除">×</button>
         </div>
       </div>`;
@@ -635,28 +641,77 @@ function addTx(){
   const idx    = parseInt(document.getElementById('wallet-select').value);
   const amount = parseInt(document.getElementById('inp-amount').value)||0;
   const memo   = document.getElementById('inp-memo').value.trim();
+  const dateVal= document.getElementById('inp-date').value;
   if(amount<=0){ document.getElementById('inp-amount').focus(); return; }
   if(!wallets[idx]){ return; }
 
-  const d = now();
-  const tx = {
-    id: Date.now().toString(36)+Math.random().toString(36).slice(2),
-    walletName: wallets[idx].name,
-    memo: memo || wallets[idx].name,
-    amount,
-    year:  d.getFullYear(),
-    month: d.getMonth()+1,
-    day:   d.getDate(),
-    ts:    d.getTime()
-  };
-  history.push(tx);
-  LS.set(KEY_HISTORY, history);
+  const d = dateVal ? new Date(dateVal+'T00:00:00') : now();
 
-  document.getElementById('inp-amount').value = '';
-  document.getElementById('inp-memo').value   = '';
+  if(editingTxId){
+    // 編集モード
+    const idx2 = history.findIndex(h=>h.id===editingTxId);
+    if(idx2>=0){
+      history[idx2] = {
+        ...history[idx2],
+        walletName: wallets[idx].name,
+        memo: memo || wallets[idx].name,
+        amount,
+        year:  d.getFullYear(),
+        month: d.getMonth()+1,
+        day:   d.getDate(),
+      };
+      LS.set(KEY_HISTORY, history);
+      showToast('✓ 記帳を修正しました');
+    }
+  } else {
+    // 新規記帳
+    const tx = {
+      id: Date.now().toString(36)+Math.random().toString(36).slice(2),
+      walletName: wallets[idx].name,
+      memo: memo || wallets[idx].name,
+      amount,
+      year:  d.getFullYear(),
+      month: d.getMonth()+1,
+      day:   d.getDate(),
+      ts:    d.getTime()
+    };
+    history.push(tx);
+    LS.set(KEY_HISTORY, history);
+    showToast(`${wallets[idx].name}に ¥${fmt(amount)} 記帳しました`);
+  }
   renderHome(); renderHistory();
   closePanel();
-  showToast(`${wallets[idx].name}に ¥${fmt(amount)} 記帳しました`);
+}
+
+function editTx(id, e){
+  e.stopPropagation();
+  const tx = history.find(h=>h.id===id);
+  if(!tx) return;
+  editingTxId = id;
+
+  // 口座セレクトを該当口座に
+  const wIdx = wallets.findIndex(w=>w.name===tx.walletName);
+  if(wIdx>=0) document.getElementById('wallet-select').value = wIdx;
+
+  // 値をセット
+  document.getElementById('inp-amount').value = tx.amount;
+  document.getElementById('inp-memo').value   = tx.memo;
+  const yyyy = tx.year;
+  const mm   = String(tx.month).padStart(2,'0');
+  const dd   = String(tx.day).padStart(2,'0');
+  document.getElementById('inp-date').value = `${yyyy}-${mm}-${dd}`;
+
+  // パネルを編集モードで開く
+  document.querySelector('.panel-title').textContent = '記帳を修正する';
+  document.getElementById('add-tx-btn').textContent  = '修正を保存する';
+  document.getElementById('add-tx-btn').disabled = false;
+  openPanel();
+  // 日付は上書きさせない
+  document.getElementById('inp-date').value = `${yyyy}-${mm}-${dd}`;
+
+  // 履歴ページから開いた場合もパネルを表示
+  panelOpen = true;
+  document.getElementById('add-panel').classList.remove('hidden');
 }
 
 function deleteTx(id, e){
@@ -897,6 +952,11 @@ function exportCSV(){
 let panelOpen = false;
 function openPanel(){
   panelOpen=true;
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth()+1).padStart(2,'0');
+  const dd = String(today.getDate()).padStart(2,'0');
+  document.getElementById('inp-date').value = `${yyyy}-${mm}-${dd}`;
   document.getElementById('add-panel').classList.remove('hidden');
 }
 function closePanel(){
@@ -905,7 +965,11 @@ function closePanel(){
   document.querySelectorAll('.card').forEach(c=>c.classList.remove('selected'));
   document.getElementById('inp-amount').value='';
   document.getElementById('inp-memo').value='';
+  document.getElementById('inp-date').value='';
   document.getElementById('add-tx-btn').disabled=true;
+  editingTxId = null;
+  document.querySelector('.panel-title').textContent='記帳する';
+  document.getElementById('add-tx-btn').textContent='記帳する';
 }
 document.getElementById('panel-handle').onclick = () => panelOpen ? closePanel() : openPanel();
 
@@ -947,6 +1011,7 @@ function showToast(msg){
 let walletsDirty = false;
 let apiDirty     = false;
 let currentPage  = 'home';
+let editingTxId  = null;
 
 function checkAddBtn(){
   const v = parseInt(document.getElementById('inp-amount').value)||0;
