@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>wallet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f0f0ed;
+  --bg2: #e6e6e2;
+  --surface: #ffffff;
+  --border: #d8d8d4;
+  --border2: #c4c4c0;
+  --text: #1a1a1a;
+  --muted: #888884;
+  --ok: #1a7a4a;
+  --ok-bg: #e6f4ec;
+  --warn: #a05a00;
+  --warn-bg: #fdf0e0;
+  --danger: #c02020;
+  --danger-bg: #fce8e8;
+  --tag-bg: #e4e4e0;
+  --sans: 'Noto Sans JP', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+  padding-bottom: 130px;
+}
+
+/* ── Nav ── */
+.nav {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--surface);
+  border-bottom: 2px solid var(--border);
+  display: flex;
+}
+.nav-tab {
+  flex: 1; padding: 15px 0; text-align: center;
+  font-size: 14px; font-weight: 700; color: var(--muted);
+  cursor: pointer; border-bottom: 3px solid transparent;
+  margin-bottom: -2px; transition: color .15s, border-color .15s;
+  user-select: none;
+}
+.nav-tab.active { color: var(--text); border-color: var(--text); }
+
+/* ── Pages ── */
+.page { display: none; }
+.page.active { display: block; }
+
+/* ── Summary ── */
+.summary {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 22px 20px 18px;
+}
+.summary-label { font-size: 13px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+.summary-amount { font-size: 46px; font-weight: 900; line-height: 1.1; letter-spacing: -1px; }
+.summary-amount small { font-size: 20px; font-weight: 700; margin-left: 3px; }
+.bar-wrap { margin: 12px 0 8px; height: 8px; background: var(--bg2); border-radius: 4px; overflow: hidden; }
+.bar-fill { height: 100%; background: var(--text); border-radius: 4px; transition: width .5s cubic-bezier(.4,0,.2,1); }
+.summary-sub { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: var(--muted); }
+
+/* ── Section label ── */
+.sec-label {
+  padding: 20px 16px 8px;
+  font-size: 11px; font-weight: 700;
+  color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase;
+}
+
+/* ── Cards ── */
+.cards { padding: 0 12px; display: flex; flex-direction: column; gap: 8px; }
+.card {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 14px; padding: 18px 20px;
+  cursor: pointer; transition: border-color .15s, box-shadow .15s;
+}
+.card:active { box-shadow: 0 2px 10px rgba(0,0,0,.1); }
+.card.selected { border-color: var(--text); }
+.card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.card-name { font-size: 18px; font-weight: 700; }
+.card-pct { font-size: 14px; font-weight: 700; }
+.card-pct.ok { color: var(--ok); }
+.card-pct.warn { color: var(--warn); }
+.card-pct.danger { color: var(--danger); }
+.bar-wrap2 { height: 6px; background: var(--bg2); border-radius: 3px; overflow: hidden; margin-bottom: 12px; }
+.bar-fill2 { height: 100%; border-radius: 3px; transition: width .5s cubic-bezier(.4,0,.2,1); }
+.fill-ok { background: var(--ok); }
+.fill-warn { background: var(--warn); }
+.fill-danger { background: var(--danger); }
+.card-bottom { display: flex; justify-content: space-between; align-items: baseline; }
+.card-remaining { font-size: 28px; font-weight: 900; letter-spacing: -0.5px; }
+.card-remaining.ok { color: var(--text); }
+.card-remaining.warn { color: var(--warn); }
+.card-remaining.danger { color: var(--danger); }
+.card-budget { font-size: 14px; font-weight: 700; color: var(--muted); }
+
+/* ── History ── */
+.history-list { padding: 0 12px; }
+.h-item {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 12px; padding: 14px 16px;
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px; animation: fadeUp .2s ease;
+}
+.h-left { display: flex; flex-direction: column; gap: 4px; }
+.h-tag {
+  display: inline-block; background: var(--tag-bg);
+  border-radius: 6px; padding: 2px 9px;
+  font-size: 12px; font-weight: 700; color: var(--muted); width: fit-content;
+}
+.h-memo { font-size: 16px; font-weight: 700; }
+.h-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.h-amount { font-size: 18px; font-weight: 900; color: var(--danger); }
+.h-date { font-size: 12px; font-weight: 700; color: var(--muted); }
+.h-del {
+  background: none; border: none; color: var(--border2);
+  font-size: 16px; cursor: pointer; padding: 2px 4px;
+  transition: color .1s;
+}
+.h-del:active { color: var(--danger); }
+.empty-msg {
+  padding: 48px 20px; text-align: center;
+  font-size: 16px; font-weight: 700; color: var(--muted);
+}
+
+/* ── Add panel ── */
+.add-panel {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 480px;
+  background: var(--surface); border-top: 2px solid var(--border);
+  padding: 14px 20px 40px; z-index: 200;
+  transition: transform .3s cubic-bezier(.4,0,.2,1);
+}
+.add-panel.hidden { transform: translate(-50%, calc(100% - 70px)); }
+.panel-handle {
+  width: 40px; height: 4px; background: var(--border2);
+  border-radius: 2px; margin: 0 auto 14px; cursor: pointer;
+}
+.panel-title {
+  font-size: 13px; font-weight: 700; color: var(--muted);
+  letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px;
+}
+.field-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: stretch; }
+.inp-select {
+  flex: 1; background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 10px; color: var(--text); font-family: var(--sans);
+  font-size: 16px; font-weight: 700; padding: 12px 14px;
+  appearance: none; -webkit-appearance: none; outline: none;
+}
+.inp-amount {
+  flex: 1; background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 10px; color: var(--text); font-family: var(--sans);
+  font-size: 26px; font-weight: 900; padding: 8px 12px;
+  text-align: right; outline: none; transition: border-color .15s;
+}
+.inp-amount:focus { border-color: var(--text); }
+.yen { font-size: 20px; font-weight: 900; color: var(--muted); align-self: center; }
+.inp-memo {
+  width: 100%; background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 10px; color: var(--text); font-family: var(--sans);
+  font-size: 16px; font-weight: 700; padding: 12px 14px;
+  outline: none; transition: border-color .15s; margin-bottom: 10px;
+}
+.inp-memo:focus { border-color: var(--text); }
+.quick-row { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.q-btn {
+  background: var(--bg2); border: 1.5px solid var(--border);
+  border-radius: 8px; color: var(--muted); font-family: var(--sans);
+  font-size: 14px; font-weight: 700; padding: 7px 13px; cursor: pointer;
+  transition: all .1s;
+}
+.q-btn:active { background: var(--text); color: #fff; border-color: var(--text); }
+.add-btn {
+  width: 100%; background: var(--text); color: #fff; border: none;
+  border-radius: 12px; font-family: var(--sans); font-size: 17px;
+  font-weight: 900; padding: 16px; cursor: pointer; transition: opacity .15s;
+}
+.add-btn:active { opacity: .75; }
+
+/* ── Settings ── */
+.settings-wrap { padding: 12px; }
+.setting-card {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 14px; margin-bottom: 8px; overflow: hidden;
+}
+.setting-head {
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.setting-head-title { font-size: 16px; font-weight: 700; }
+.setting-head-sub { font-size: 13px; font-weight: 700; color: var(--muted); }
+.wallet-row {
+  display: flex; gap: 8px; align-items: center;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+}
+.wallet-row:last-child { border-bottom: none; }
+.inp-name {
+  flex: 1; background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 8px; color: var(--text); font-family: var(--sans);
+  font-size: 15px; font-weight: 700; padding: 9px 12px; outline: none;
+  transition: border-color .15s;
+}
+.inp-name:focus { border-color: var(--text); }
+.inp-budget {
+  width: 110px; background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 8px; color: var(--text); font-family: var(--sans);
+  font-size: 15px; font-weight: 900; padding: 9px 10px;
+  text-align: right; outline: none; transition: border-color .15s;
+}
+.inp-budget:focus { border-color: var(--text); }
+.del-btn {
+  background: none; border: 1.5px solid var(--border);
+  border-radius: 8px; color: var(--muted); font-size: 18px;
+  width: 36px; height: 36px; cursor: pointer; flex-shrink: 0;
+  transition: all .1s; display: flex; align-items: center; justify-content: center;
+}
+.del-btn:active { background: var(--danger-bg); border-color: var(--danger); color: var(--danger); }
+.add-wallet-btn {
+  width: 100%; background: none; border: 1.5px dashed var(--border2);
+  border-radius: 10px; color: var(--muted); font-family: var(--sans);
+  font-size: 15px; font-weight: 700; padding: 13px; cursor: pointer;
+  margin-top: 4px; transition: all .15s;
+}
+.add-wallet-btn:active { background: var(--bg2); }
+.save-btn {
+  width: 100%; background: var(--text); color: #fff; border: none;
+  border-radius: 12px; font-family: var(--sans); font-size: 17px;
+  font-weight: 900; padding: 16px; cursor: pointer; margin-top: 12px;
+  transition: opacity .15s;
+}
+.save-btn:active { opacity: .75; }
+.api-row {
+  padding: 14px; display: flex; flex-direction: column; gap: 8px;
+}
+.api-label { font-size: 13px; font-weight: 700; color: var(--muted); }
+.inp-api {
+  width: 100%; background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 8px; color: var(--text); font-family: monospace;
+  font-size: 13px; padding: 10px 12px; outline: none;
+  transition: border-color .15s;
+}
+.inp-api:focus { border-color: var(--text); }
+.api-note { font-size: 12px; font-weight: 500; color: var(--muted); line-height: 1.6; }
+.danger-zone { margin-top: 8px; }
+.reset-btn {
+  width: 100%; background: none; border: 1.5px solid var(--border);
+  border-radius: 12px; color: var(--muted); font-family: var(--sans);
+  font-size: 15px; font-weight: 700; padding: 14px; cursor: pointer;
+  transition: all .15s;
+}
+.reset-btn:active { background: var(--danger-bg); border-color: var(--danger); color: var(--danger); }
+
+/* ── Report ── */
+.report-wrap { padding: 12px; }
+.month-selector {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 14px; padding: 14px 18px; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 12px;
+}
+.month-btn {
+  background: var(--bg2); border: 1.5px solid var(--border);
+  border-radius: 8px; color: var(--text); font-size: 18px; font-weight: 700;
+  width: 38px; height: 38px; cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .1s;
+}
+.month-btn:active { background: var(--text); color: #fff; }
+.month-display { flex: 1; text-align: center; font-size: 18px; font-weight: 900; }
+.report-btn {
+  width: 100%; background: var(--text); color: #fff; border: none;
+  border-radius: 12px; font-family: var(--sans); font-size: 17px;
+  font-weight: 900; padding: 18px; cursor: pointer; margin-bottom: 16px;
+  transition: opacity .15s;
+}
+.report-btn:active { opacity: .75; }
+.report-btn:disabled { opacity: .4; cursor: not-allowed; }
+.report-card {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 14px; overflow: hidden; margin-bottom: 8px;
+}
+.report-section { padding: 16px 18px; border-bottom: 1px solid var(--border); }
+.report-section:last-child { border-bottom: none; }
+.report-sec-label {
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 12px;
+}
+.report-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 7px 0; border-bottom: 1px solid var(--border);
+}
+.report-row:last-child { border-bottom: none; }
+.report-row-name { font-size: 15px; font-weight: 700; }
+.report-row-right { display: flex; gap: 10px; align-items: center; }
+.report-row-val { font-size: 15px; font-weight: 900; }
+.report-row-sub { font-size: 12px; font-weight: 700; color: var(--muted); }
+.badge {
+  display: inline-block; border-radius: 20px; padding: 3px 11px;
+  font-size: 12px; font-weight: 700; flex-shrink: 0;
+}
+.badge-ok { background: var(--ok-bg); color: var(--ok); }
+.badge-warn { background: var(--warn-bg); color: var(--warn); }
+.badge-danger { background: var(--danger-bg); color: var(--danger); }
+.ai-box {
+  background: var(--bg); border-radius: 10px; padding: 16px;
+  font-size: 16px; font-weight: 500; line-height: 1.9; color: var(--text);
+}
+.ai-loading {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 15px; font-weight: 700; color: var(--muted); padding: 8px 0;
+}
+.spinner {
+  width: 20px; height: 20px; border: 3px solid var(--border);
+  border-top-color: var(--text); border-radius: 50%;
+  animation: spin .7s linear infinite; flex-shrink: 0;
+}
+.export-btn {
+  width: 100%; background: var(--bg2); color: var(--text);
+  border: 1.5px solid var(--border); border-radius: 12px;
+  font-family: var(--sans); font-size: 16px; font-weight: 700;
+  padding: 14px; cursor: pointer; transition: all .15s;
+}
+.export-btn:active { background: var(--border2); }
+.no-data-msg {
+  padding: 48px 20px; text-align: center;
+  font-size: 16px; font-weight: 700; color: var(--muted);
+}
+
+/* ── Toast ── */
+.toast {
+  position: fixed; bottom: 140px; left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--text); color: #fff; padding: 12px 24px;
+  border-radius: 12px; font-size: 15px; font-weight: 700;
+  opacity: 0; transition: opacity .2s, transform .2s;
+  pointer-events: none; white-space: nowrap; z-index: 999;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+@keyframes fadeUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-tab active"  onclick="showPage('home',this)">ホーム</div>
+  <div class="nav-tab"         onclick="showPage('history',this)">履歴</div>
+  <div class="nav-tab"         onclick="showPage('report',this)">集計</div>
+  <div class="nav-tab"         onclick="showPage('settings',this)">設定</div>
+</nav>
+
+<!-- ════ HOME ════ -->
+<div class="page active" id="page-home">
+  <div class="summary">
+    <div class="summary-label">今月の残高合計</div>
+    <div class="summary-amount" id="total-amount">¥0<small>円</small></div>
+    <div class="bar-wrap"><div class="bar-fill" id="total-bar" style="width:0%"></div></div>
+    <div class="summary-sub">
+      <span>使用済み <strong id="used-txt">¥0</strong></span>
+      <span>予算合計 <strong id="budget-txt">¥0</strong></span>
+    </div>
+  </div>
+  <div class="sec-label">口座一覧</div>
+  <div class="cards" id="cards"></div>
+</div>
+
+<!-- ════ HISTORY ════ -->
+<div class="page" id="page-history">
+  <div class="sec-label">記帳履歴</div>
+  <div class="history-list" id="history-list"></div>
+</div>
+
+<!-- ════ REPORT ════ -->
+<div class="page" id="page-report">
+  <div class="report-wrap">
+    <div class="month-selector">
+      <button class="month-btn" onclick="changeReportMonth(-1)">‹</button>
+      <div class="month-display" id="report-month-label"></div>
+      <button class="month-btn" onclick="changeReportMonth(1)">›</button>
+    </div>
+    <button class="report-btn" id="report-btn" onclick="runReport()">集計してAI評価を出す</button>
+    <div id="report-output" style="display:none">
+      <div class="report-card">
+        <div class="report-section">
+          <div class="report-sec-label">口座別 使用状況</div>
+          <div id="report-rows"></div>
+        </div>
+        <div class="report-section">
+          <div class="report-sec-label">AI 評価・アドバイス</div>
+          <div id="ai-output"></div>
+        </div>
+      </div>
+      <button class="export-btn" onclick="exportCSV()">📥 Excelに出力（CSV）</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ SETTINGS ════ -->
+<div class="page" id="page-settings">
+  <div class="settings-wrap">
+
+    <div class="sec-label">口座と予算</div>
+    <div class="setting-card">
+      <div class="setting-head">
+        <div class="setting-head-title">口座一覧</div>
+        <div class="setting-head-sub">名前　予算額</div>
+      </div>
+      <div id="wallet-settings"></div>
+    </div>
+    <button class="add-wallet-btn" onclick="addWallet()">＋ 口座を追加</button>
+    <button class="save-btn" onclick="saveWallets()">口座設定を保存</button>
+
+    <div class="sec-label" style="margin-top:12px">Claude API キー</div>
+    <div class="setting-card">
+      <div class="api-row">
+        <div class="api-label">APIキーを入力すると集計画面でAI評価が使えます</div>
+        <input type="password" class="inp-api" id="inp-api" placeholder="sk-ant-...">
+        <div class="api-note">キーはこのデバイス内にのみ保存されます。外部に送信されることはありません。</div>
+        <button class="save-btn" style="margin-top:4px" onclick="saveApiKey()">APIキーを保存</button>
+      </div>
+    </div>
+
+    <div class="sec-label" style="margin-top:12px">データ管理</div>
+    <div class="setting-card danger-zone">
+      <div style="padding:14px">
+        <button class="reset-btn" onclick="resetAllData()">⚠ すべてのデータをリセット</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ════ ADD PANEL ════ -->
+<div class="add-panel hidden" id="add-panel">
+  <div class="panel-handle" id="panel-handle"></div>
+  <div class="panel-title">記帳する</div>
+  <div class="field-row">
+    <select class="inp-select" id="wallet-select"></select>
+  </div>
+  <div class="quick-row">
+    <button class="q-btn" onclick="qa(500)">¥500</button>
+    <button class="q-btn" onclick="qa(1000)">¥1,000</button>
+    <button class="q-btn" onclick="qa(2000)">¥2,000</button>
+    <button class="q-btn" onclick="qa(3000)">¥3,000</button>
+    <button class="q-btn" onclick="qa(5000)">¥5,000</button>
+    <button class="q-btn" onclick="qa(10000)">¥10,000</button>
+  </div>
+  <div class="field-row">
+    <span class="yen">¥</span>
+    <input type="number" class="inp-amount" id="inp-amount" placeholder="0" inputmode="numeric">
+  </div>
+  <input type="text" class="inp-memo" id="inp-memo" placeholder="メモ（任意）">
+  <button class="add-btn" onclick="addTx()">記帳する</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════
+//  Storage helpers
+// ════════════════════════════════
+const LS = {
+  get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch{ return null; } },
+  set: (k,v) => localStorage.setItem(k, JSON.stringify(v)),
+  del: k => localStorage.removeItem(k)
+};
+
+const KEY_WALLETS  = 'wlt_wallets';
+const KEY_HISTORY  = 'wlt_history';
+const KEY_API      = 'wlt_apikey';
+
+// ════════════════════════════════
+//  State
+// ════════════════════════════════
+let wallets = LS.get(KEY_WALLETS) || [
+  {name:'食費',       budget:20000},
+  {name:'交通費',     budget:8000},
+  {name:'日用品',     budget:5000},
+  {name:'趣味・娯楽', budget:10000},
+  {name:'被服・美容', budget:8000},
+  {name:'医療・健康', budget:5000},
+  {name:'交際費',     budget:8000},
+  {name:'雑費',       budget:6000},
+];
+// history: [{id, walletName, memo, amount, year, month, day, ts}]
+let history = LS.get(KEY_HISTORY) || [];
+
+let reportYear  = new Date().getFullYear();
+let reportMonth = new Date().getMonth() + 1;
+
+// ════════════════════════════════
+//  Helpers
+// ════════════════════════════════
+const fmt   = n => Number(n).toLocaleString('ja-JP');
+const cls   = pct => pct>=90?'danger':pct>=70?'warn':'ok';
+const fCls  = pct => pct>=90?'fill-danger':pct>=70?'fill-warn':'fill-ok';
+const now   = () => new Date();
+const ym    = (y,m) => `${y}-${String(m).padStart(2,'0')}`;
+
+function todayStr(){
+  const d = now();
+  return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+}
+function currentYM(){ const d=now(); return ym(d.getFullYear(), d.getMonth()+1); }
+
+// spent for a wallet name in current month
+function spentThisMonth(walletName){
+  const cym = currentYM();
+  return history
+    .filter(h => h.walletName === walletName && ym(h.year,h.month) === cym)
+    .reduce((s,h) => s+h.amount, 0);
+}
+// spent for a wallet name in given year/month
+function spentInMonth(walletName, y, m){
+  const target = ym(y,m);
+  return history
+    .filter(h => h.walletName === walletName && ym(h.year,h.month) === target)
+    .reduce((s,h) => s+h.amount, 0);
+}
+
+// ════════════════════════════════
+//  Render Home
+// ════════════════════════════════
+function renderHome(){
+  let totalBudget=0, totalSpent=0;
+  wallets.forEach(w => {
+    totalBudget += w.budget;
+    totalSpent  += spentThisMonth(w.name);
+  });
+  const totalRem = totalBudget - totalSpent;
+  const pctUsed  = totalBudget>0 ? Math.round(totalSpent/totalBudget*100) : 0;
+
+  document.getElementById('total-amount').innerHTML = `¥${fmt(totalRem)}<small>円</small>`;
+  document.getElementById('total-bar').style.width  = Math.max(0,100-pctUsed)+'%';
+  document.getElementById('used-txt').textContent   = '¥'+fmt(totalSpent);
+  document.getElementById('budget-txt').textContent = '¥'+fmt(totalBudget);
+
+  const container = document.getElementById('cards');
+  container.innerHTML = '';
+  wallets.forEach((w,i) => {
+    const spent = spentThisMonth(w.name);
+    const rem   = w.budget - spent;
+    const pct   = w.budget>0 ? Math.min(100,Math.round(spent/w.budget*100)) : 0;
+    const c     = cls(pct);
+    const card  = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-top">
+        <div class="card-name">${w.name}</div>
+        <div class="card-pct ${c}">${pct}%使用</div>
+      </div>
+      <div class="bar-wrap2"><div class="bar-fill2 ${fCls(pct)}" style="width:${pct}%"></div></div>
+      <div class="card-bottom">
+        <div class="card-remaining ${c}">¥${fmt(rem)}</div>
+        <div class="card-budget">/ ¥${fmt(w.budget)}</div>
+      </div>`;
+    card.onclick = () => {
+      document.querySelectorAll('.card').forEach(c=>c.classList.remove('selected'));
+      card.classList.add('selected');
+      document.getElementById('wallet-select').value = i;
+      openPanel();
+    };
+    container.appendChild(card);
+  });
+}
+
+// ════════════════════════════════
+//  Render History
+// ════════════════════════════════
+function renderHistory(){
+  const c = document.getElementById('history-list');
+  c.innerHTML = '';
+  if(!history.length){
+    c.innerHTML = '<div class="empty-msg">記帳はまだありません</div>';
+    return;
+  }
+  const sorted = [...history].sort((a,b)=>b.ts-a.ts);
+  sorted.forEach(h => {
+    const d = document.createElement('div');
+    d.className = 'h-item';
+    const dateStr = `${String(h.month).padStart(2,'0')}/${String(h.day).padStart(2,'0')}`;
+    d.innerHTML = `
+      <div class="h-left">
+        <span class="h-tag">${h.walletName}</span>
+        <div class="h-memo">${h.memo||h.walletName}</div>
+      </div>
+      <div class="h-right">
+        <div class="h-amount">−¥${fmt(h.amount)}</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="h-date">${h.year}/${dateStr}</div>
+          <button class="h-del" onclick="deleteTx('${h.id}',event)" title="削除">×</button>
+        </div>
+      </div>`;
+    c.appendChild(d);
+  });
+}
+
+// ════════════════════════════════
+//  Add / Delete transaction
+// ════════════════════════════════
+function renderSelect(){
+  const sel = document.getElementById('wallet-select');
+  sel.innerHTML = wallets.map((w,i)=>`<option value="${i}">${w.name}</option>`).join('');
+}
+
+function qa(v){ document.getElementById('inp-amount').value=v; document.getElementById('inp-amount').focus(); }
+
+function addTx(){
+  const idx    = parseInt(document.getElementById('wallet-select').value);
+  const amount = parseInt(document.getElementById('inp-amount').value)||0;
+  const memo   = document.getElementById('inp-memo').value.trim();
+  if(amount<=0){ document.getElementById('inp-amount').focus(); return; }
+  if(!wallets[idx]){ return; }
+
+  const d = now();
+  const tx = {
+    id: Date.now().toString(36)+Math.random().toString(36).slice(2),
+    walletName: wallets[idx].name,
+    memo: memo || wallets[idx].name,
+    amount,
+    year:  d.getFullYear(),
+    month: d.getMonth()+1,
+    day:   d.getDate(),
+    ts:    d.getTime()
+  };
+  history.push(tx);
+  LS.set(KEY_HISTORY, history);
+
+  document.getElementById('inp-amount').value = '';
+  document.getElementById('inp-memo').value   = '';
+  renderHome(); renderHistory();
+  closePanel();
+  showToast(`${wallets[idx].name}に ¥${fmt(amount)} 記帳しました`);
+}
+
+function deleteTx(id, e){
+  e.stopPropagation();
+  if(!confirm('この記帳を削除しますか？')) return;
+  history = history.filter(h=>h.id!==id);
+  LS.set(KEY_HISTORY, history);
+  renderHistory(); renderHome();
+  showToast('削除しました');
+}
+
+// ════════════════════════════════
+//  Settings
+// ════════════════════════════════
+function renderSettings(){
+  const c = document.getElementById('wallet-settings');
+  c.innerHTML = '';
+  wallets.forEach((w,i)=>{
+    const row = document.createElement('div');
+    row.className = 'wallet-row';
+    row.dataset.idx = i;
+    row.innerHTML = `
+      <input class="inp-name" type="text" value="${w.name}" placeholder="口座名">
+      <input class="inp-budget" type="number" value="${w.budget}" placeholder="予算" inputmode="numeric">
+      <button class="del-btn" onclick="delWalletRow(${i})">×</button>`;
+    c.appendChild(row);
+  });
+  // APIキー表示
+  const stored = LS.get(KEY_API)||'';
+  document.getElementById('inp-api').value = stored ? '●'.repeat(20) : '';
+}
+
+function addWallet(){
+  wallets.push({name:'新しい口座', budget:10000});
+  renderSettings();
+  const inputs = document.querySelectorAll('.inp-name');
+  const last = inputs[inputs.length-1];
+  last.focus(); last.select();
+}
+
+function delWalletRow(i){
+  if(wallets.length<=1){ showToast('口座は1つ以上必要です'); return; }
+  const name = wallets[i].name;
+  if(!confirm(`「${name}」を削除しますか？\n（記帳履歴は残ります）`)) return;
+  wallets.splice(i,1);
+  LS.set(KEY_WALLETS, wallets);
+  renderSettings(); renderHome(); renderSelect();
+}
+
+function saveWallets(){
+  const rows = document.querySelectorAll('#wallet-settings .wallet-row');
+  const newWallets = Array.from(rows).map(row=>{
+    const name   = row.querySelector('.inp-name').value.trim()||'口座';
+    const budget = parseInt(row.querySelector('.inp-budget').value)||0;
+    return {name, budget};
+  });
+  wallets = newWallets;
+  LS.set(KEY_WALLETS, wallets);
+  renderHome(); renderSelect(); renderSettings();
+  showToast('口座設定を保存しました');
+}
+
+function saveApiKey(){
+  const val = document.getElementById('inp-api').value.trim();
+  if(val && !val.startsWith('●')){
+    LS.set(KEY_API, val);
+    showToast('APIキーを保存しました');
+    document.getElementById('inp-api').value = '●'.repeat(20);
+  } else if(!val){
+    LS.del(KEY_API);
+    showToast('APIキーを削除しました');
+  }
+}
+
+function resetAllData(){
+  if(!confirm('すべての記帳履歴・設定を削除します。この操作は元に戻せません。よろしいですか？')) return;
+  if(!confirm('本当に削除してよいですか？')) return;
+  LS.del(KEY_WALLETS); LS.del(KEY_HISTORY); LS.del(KEY_API);
+  location.reload();
+}
+
+// ════════════════════════════════
+//  Report
+// ════════════════════════════════
+function updateReportMonthLabel(){
+  document.getElementById('report-month-label').textContent =
+    `${reportYear}年${reportMonth}月`;
+}
+function changeReportMonth(delta){
+  reportMonth += delta;
+  if(reportMonth > 12){ reportMonth=1; reportYear++; }
+  if(reportMonth < 1) { reportMonth=12; reportYear--; }
+  updateReportMonthLabel();
+  document.getElementById('report-output').style.display='none';
+  document.getElementById('report-btn').disabled=false;
+}
+
+async function runReport(){
+  const btn = document.getElementById('report-btn');
+  btn.disabled = true;
+
+  // 対象月の記帳があるか確認
+  const target = ym(reportYear, reportMonth);
+  const monthHistory = history.filter(h => ym(h.year,h.month)===target);
+
+  document.getElementById('report-output').style.display='block';
+
+  // 口座別集計
+  const rows = document.getElementById('report-rows');
+  rows.innerHTML = '';
+  let hasData = false;
+
+  wallets.forEach(w => {
+    const spent = spentInMonth(w.name, reportYear, reportMonth);
+    if(spent===0 && monthHistory.length===0) return;
+    hasData = true;
+    const pct = w.budget>0 ? Math.min(100,Math.round(spent/w.budget*100)) : 0;
+    const c   = cls(pct);
+    const badgeCls = c==='ok'?'badge-ok':c==='warn'?'badge-warn':'badge-danger';
+    const label    = pct>=90?'注意':pct>=70?'やや多い':'良好';
+    const row = document.createElement('div');
+    row.className = 'report-row';
+    row.innerHTML = `
+      <div class="report-row-name">${w.name}</div>
+      <div class="report-row-right">
+        <div>
+          <span class="report-row-val">¥${fmt(spent)}</span>
+          <span class="report-row-sub"> / ¥${fmt(w.budget)}</span>
+        </div>
+        <span class="badge ${badgeCls}">${label}</span>
+      </div>`;
+    rows.appendChild(row);
+  });
+
+  if(!hasData){
+    rows.innerHTML = '<div class="empty-msg" style="padding:20px 0">この月の記帳データがありません</div>';
+    document.getElementById('ai-output').innerHTML = '';
+    btn.disabled=false;
+    return;
+  }
+
+  // AI評価
+  const aiBox = document.getElementById('ai-output');
+  aiBox.innerHTML = '<div class="ai-loading"><div class="spinner"></div>AIが分析中...</div>';
+
+  const apiKey = LS.get(KEY_API);
+  if(!apiKey){
+    aiBox.innerHTML = `<div class="ai-box" style="color:var(--muted)">設定画面でClaude APIキーを入力すると、ここにAIのコメントが表示されます。</div>`;
+    btn.disabled=false;
+    return;
+  }
+
+  const summary = wallets.map(w => {
+    const spent = spentInMonth(w.name, reportYear, reportMonth);
+    const pct   = w.budget>0 ? Math.round(spent/w.budget*100) : 0;
+    return `・${w.name}：予算¥${fmt(w.budget)}、使用¥${fmt(spent)}（${pct}%）`;
+  }).join('\n');
+
+  const prompt = `あなたはやさしい家計アドバイザーです。
+以下は${reportYear}年${reportMonth}月のおこづかい使用状況です。
+
+${summary}
+
+この結果について、以下の順番でコメントをしてください。
+1. 全体の評価（一言）
+2. よかった点（具体的に）
+3. 来月への注意点（あれば）
+4. 応援の一言
+
+文体はやわらかく話しかけるように。300文字以内でまとめてください。`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-5',
+        max_tokens: 600,
+        messages: [{ role:'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    if(data.error){ throw new Error(data.error.message); }
+    const text = data.content?.find(b=>b.type==='text')?.text || '';
+    aiBox.innerHTML = `<div class="ai-box">${text.replace(/\n/g,'<br>')}</div>`;
+  } catch(e) {
+    aiBox.innerHTML = `<div class="ai-box" style="color:var(--danger)">エラー: ${e.message}<br><small>APIキーを確認してください。</small></div>`;
+  }
+  btn.disabled=false;
+}
+
+// ════════════════════════════════
+//  Export CSV
+// ════════════════════════════════
+function exportCSV(){
+  const target = ym(reportYear, reportMonth);
+  let csv = `\uFEFF${reportYear}年${reportMonth}月 おこづかい集計\n\n`;
+  csv += '口座名,予算,使用額,残高,使用率\n';
+  wallets.forEach(w => {
+    const spent = spentInMonth(w.name, reportYear, reportMonth);
+    const rem   = w.budget - spent;
+    const pct   = w.budget>0 ? Math.round(spent/w.budget*100) : 0;
+    csv += `${w.name},${w.budget},${spent},${rem},${pct}%\n`;
+  });
+  csv += '\n記帳履歴\n日付,口座,メモ,金額\n';
+  history
+    .filter(h => ym(h.year,h.month)===target)
+    .sort((a,b)=>b.ts-a.ts)
+    .forEach(h => {
+      csv += `${h.year}/${String(h.month).padStart(2,'0')}/${String(h.day).padStart(2,'0')},${h.walletName},${h.memo},${h.amount}\n`;
+    });
+
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href=url; a.download=`okozukai_${reportYear}${String(reportMonth).padStart(2,'0')}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  showToast('CSVを出力しました');
+}
+
+// ════════════════════════════════
+//  Panel
+// ════════════════════════════════
+let panelOpen = false;
+function openPanel(){
+  panelOpen=true;
+  document.getElementById('add-panel').classList.remove('hidden');
+}
+function closePanel(){
+  panelOpen=false;
+  document.getElementById('add-panel').classList.add('hidden');
+  document.querySelectorAll('.card').forEach(c=>c.classList.remove('selected'));
+}
+document.getElementById('panel-handle').onclick = () => panelOpen ? closePanel() : openPanel();
+
+// ════════════════════════════════
+//  Nav
+// ════════════════════════════════
+function showPage(id, tab){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  tab.classList.add('active');
+  if(id==='settings') renderSettings();
+  if(id==='history')  renderHistory();
+  if(id==='report')   updateReportMonthLabel();
+  closePanel();
+}
+
+// ════════════════════════════════
+//  Toast
+// ════════════════════════════════
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+// ════════════════════════════════
+//  Init
+// ════════════════════════════════
+renderHome();
+renderSelect();
+renderHistory();
+updateReportMonthLabel();
+</script>
+</body>
+</html>
