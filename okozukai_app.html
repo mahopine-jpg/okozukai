@@ -181,9 +181,12 @@ body {
 .add-btn {
   width: 100%; background: var(--text); color: #fff; border: none;
   border-radius: 12px; font-family: var(--sans); font-size: 17px;
-  font-weight: 900; padding: 16px; cursor: pointer; transition: opacity .15s;
+  font-weight: 900; padding: 16px; cursor: pointer; transition: opacity .15s, background .2s;
 }
 .add-btn:active { opacity: .75; }
+.add-btn:disabled {
+  background: var(--border2); color: var(--muted); cursor: not-allowed; opacity: 1;
+}
 
 /* ── Settings ── */
 .settings-wrap { padding: 12px; }
@@ -464,12 +467,12 @@ body {
     <button class="q-btn" onclick="qa(5000)">¥5,000</button>
     <button class="q-btn" onclick="qa(10000)">¥10,000</button>
   </div>
-  <div class="field-row">
-    <span class="yen">¥</span>
-    <input type="number" class="inp-amount" id="inp-amount" placeholder="0" inputmode="numeric">
+  <div class="field-row" style="align-items:center">
+    <span class="yen" style="flex-shrink:0">¥</span>
+    <input type="number" class="inp-amount" id="inp-amount" placeholder="0" inputmode="numeric" oninput="checkAddBtn()" style="flex:1;min-width:0;width:100%">
   </div>
   <input type="text" class="inp-memo" id="inp-memo" placeholder="メモ（任意）">
-  <button class="add-btn" onclick="addTx()">記帳する</button>
+  <button class="add-btn" id="add-tx-btn" onclick="addTx()" disabled>記帳する</button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -622,7 +625,11 @@ function renderSelect(){
   sel.innerHTML = wallets.map((w,i)=>`<option value="${i}">${w.name}</option>`).join('');
 }
 
-function qa(v){ document.getElementById('inp-amount').value=v; document.getElementById('inp-amount').focus(); }
+function qa(v){
+  document.getElementById('inp-amount').value=v;
+  document.getElementById('inp-amount').focus();
+  checkAddBtn();
+}
 
 function addTx(){
   const idx    = parseInt(document.getElementById('wallet-select').value);
@@ -896,6 +903,9 @@ function closePanel(){
   panelOpen=false;
   document.getElementById('add-panel').classList.add('hidden');
   document.querySelectorAll('.card').forEach(c=>c.classList.remove('selected'));
+  document.getElementById('inp-amount').value='';
+  document.getElementById('inp-memo').value='';
+  document.getElementById('add-tx-btn').disabled=true;
 }
 document.getElementById('panel-handle').onclick = () => panelOpen ? closePanel() : openPanel();
 
@@ -938,6 +948,10 @@ let walletsDirty = false;
 let apiDirty     = false;
 let currentPage  = 'home';
 
+function checkAddBtn(){
+  const v = parseInt(document.getElementById('inp-amount').value)||0;
+  document.getElementById('add-tx-btn').disabled = v <= 0;
+}
 function markWalletsDirty(){
   walletsDirty = true;
   document.getElementById('save-wallets-btn').disabled = false;
