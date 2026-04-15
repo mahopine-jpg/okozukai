@@ -199,26 +199,34 @@ body {
 .setting-head-sub { font-size: 13px; font-weight: 700; color: var(--muted); }
 .wallet-row {
   display: flex; gap: 8px; align-items: center;
-  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
 }
 .wallet-row:last-child { border-bottom: none; }
+.wallet-row-top { display: none; }
+.wallet-row-bottom { display: none; }
+.wallet-row-label { display: none; }
 .inp-name {
-  flex: 1; background: var(--bg); border: 1.5px solid var(--border);
+  flex: 2; min-width: 0;
+  background: var(--bg); border: 1.5px solid var(--border);
   border-radius: 8px; color: var(--text); font-family: var(--sans);
-  font-size: 15px; font-weight: 700; padding: 9px 12px; outline: none;
+  font-size: 15px; font-weight: 700; padding: 10px 12px; outline: none;
   transition: border-color .15s;
 }
 .inp-name:focus { border-color: var(--text); }
 .inp-budget {
-  width: 110px; background: var(--bg); border: 1.5px solid var(--border);
+  flex: 1; min-width: 0;
+  background: var(--bg); border: 1.5px solid var(--border);
   border-radius: 8px; color: var(--text); font-family: var(--sans);
-  font-size: 15px; font-weight: 900; padding: 9px 10px;
+  font-size: 15px; font-weight: 900; padding: 10px 8px;
   text-align: right; outline: none; transition: border-color .15s;
 }
 .inp-budget:focus { border-color: var(--text); }
+.budget-yen {
+  font-size: 14px; font-weight: 700; color: var(--muted); flex-shrink: 0;
+}
 .del-btn {
   background: none; border: 1.5px solid var(--border);
-  border-radius: 8px; color: var(--muted); font-size: 18px;
+  border-radius: 8px; color: var(--muted); font-size: 16px;
   width: 36px; height: 36px; cursor: pointer; flex-shrink: 0;
   transition: all .1s; display: flex; align-items: center; justify-content: center;
 }
@@ -411,7 +419,7 @@ body {
     <div class="setting-card">
       <div class="setting-head">
         <div class="setting-head-title">口座一覧</div>
-        <div class="setting-head-sub">名前　予算額</div>
+        <div class="setting-head-sub" style="font-size:12px">口座名　　　　¥予算</div>
       </div>
       <div id="wallet-settings"></div>
     </div>
@@ -662,7 +670,8 @@ function renderSettings(){
     row.dataset.idx = i;
     row.innerHTML = `
       <input class="inp-name" type="text" value="${w.name}" placeholder="口座名">
-      <input class="inp-budget" type="number" value="${w.budget}" placeholder="予算" inputmode="numeric">
+      <span class="budget-yen">¥</span>
+      <input class="inp-budget" type="number" value="${w.budget}" placeholder="0" inputmode="numeric">
       <button class="del-btn" onclick="delWalletRow(${i})">×</button>`;
     c.appendChild(row);
   });
