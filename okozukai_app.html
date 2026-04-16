@@ -412,8 +412,12 @@ body {
           <div id="ai-output"></div>
         </div>
       </div>
+      <button class="export-btn" id="rollover-btn" onclick="doRollover()" style="display:none;background:var(--text);color:#fff;border-color:var(--text);margin-bottom:8px">🏦 月次繰越する（貯金口座に積み立て）</button>
       <button class="export-btn" onclick="exportCSV()">📥 Excelに出力（CSV）</button>
+      <button class="export-btn" onclick="exportSummaryCSV()" style="margin-top:8px">📊 月次サマリCSVを出力（全月分）</button>
     </div>
+    <div class="sec-label" style="padding-left:0;margin-top:16px">月次サマリ履歴</div>
+    <div id="summary-list"></div>
   </div>
 </div>
 
@@ -444,8 +448,9 @@ body {
 
     <div class="sec-label" style="margin-top:12px">データ管理</div>
     <div class="setting-card danger-zone">
-      <div style="padding:14px">
-        <button class="reset-btn" onclick="resetAllData()">⚠ 今月の記帳履歴をリセット</button>
+      <div style="padding:14px;display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:4px">月次繰越は「集計」タブから行ってください</div>
+        <button class="reset-btn" onclick="resetAllData()">⚠ すべてのデータをリセット（初期化）</button>
       </div>
     </div>
 
@@ -491,22 +496,26 @@ const LS = {
 const KEY_WALLETS  = 'wlt_wallets';
 const KEY_HISTORY  = 'wlt_history';
 const KEY_API      = 'wlt_apikey';
+const KEY_SAVINGS  = 'wlt_savings';   // 貯金残高
+const KEY_SUMMARY  = 'wlt_summary';   // 月次サマリ履歴
 
 // ════════════════════════════════
 //  State
 // ════════════════════════════════
 let wallets = LS.get(KEY_WALLETS) || [
-  {name:'食費',       budget:20000},
-  {name:'交通費',     budget:8000},
-  {name:'日用品',     budget:5000},
-  {name:'趣味・娯楽', budget:10000},
-  {name:'被服・美容', budget:8000},
-  {name:'医療・健康', budget:5000},
-  {name:'交際費',     budget:8000},
-  {name:'雑費',       budget:6000},
+  {name:'代表口座',     budget:15000},
+  {name:'財布（現金）', budget:10000},
+  {name:'PayPay',      budget:10000},
+  {name:'Suica',       budget:2500},
+  {name:'被服費',       budget:5000},
+  {name:'医療費',       budget:3500},
 ];
 // history: [{id, walletName, memo, amount, year, month, day, ts}]
 let history = LS.get(KEY_HISTORY) || [];
+// savings: 貯金口座の残高
+let savings = LS.get(KEY_SAVINGS) || 0;
+// monthlySummaries: [{year, month, wallets:[{name,budget,spent}], totalRem, aiComment, ts}]
+let monthlySummaries = LS.get(KEY_SUMMARY) || [];
 
 let reportYear  = new Date().getFullYear();
 let reportMonth = new Date().getMonth() + 1;
@@ -530,14 +539,17 @@ function currentYM(){ const d=now(); return ym(d.getFullYear(), d.getMonth()+1);
 function spentThisMonth(walletName){
   const cym = currentYM();
   return history
-    .filter(h => h.walletName === walletName && ym(h.year,h.month) === cym)
+    .filter(h => h.walletName === walletName && ym(h.year,h.month) === cym && !h.rolledOver)
     .reduce((s,h) => s+h.amount, 0);
 }
 // spent for a wallet name in given year/month
 function spentInMonth(walletName, y, m){
   const target = ym(y,m);
+  // 集計・繰越済みの月はrolledOverに関わらず全件対象
+  const cym = currentYM();
+  const isCurrentMonth = target === cym;
   return history
-    .filter(h => h.walletName === walletName && ym(h.year,h.month) === target)
+    .filter(h => h.walletName === walletName && ym(h.year,h.month) === target && (isCurrentMonth ? !h.rolledOver : true))
     .reduce((s,h) => s+h.amount, 0);
 }
 
@@ -558,8 +570,22 @@ function renderHome(){
   document.getElementById('used-txt').textContent   = '¥'+fmt(totalSpent);
   document.getElementById('budget-txt').textContent = '¥'+fmt(totalBudget);
 
+  // 貯金口座カード
+  const savingsCard = document.createElement('div');
+  savingsCard.className = 'card savings-card';
+  savingsCard.innerHTML = `
+    <div class="card-top">
+      <div class="card-name">🏦 貯金口座</div>
+      <div class="card-pct ok">積立</div>
+    </div>
+    <div class="card-bottom" style="margin-top:10px">
+      <div class="card-remaining ok">¥${fmt(savings)}</div>
+      <div class="card-budget">累計残金</div>
+    </div>`;
+
   const container = document.getElementById('cards');
   container.innerHTML = '';
+  container.appendChild(savingsCard);
   wallets.forEach((w,i) => {
     const spent = spentThisMonth(w.name);
     const rem   = w.budget - spent;
@@ -794,12 +820,12 @@ function saveApiKey(){
 }
 
 function resetAllData(){
-  if(!confirm('今月の記帳履歴をすべて削除します。\n口座設定・APIキーは残ります。\nよろしいですか？')) return;
-  if(!confirm('本当に削除してよいですか？')) return;
-  history = [];
-  LS.set(KEY_HISTORY, history);
-  renderHome(); renderHistory();
-  showToast('記帳履歴をリセットしました');
+  if(!confirm('すべてのデータ（記帳履歴・貯金・月次サマリ）を削除します。\n口座設定・APIキーは残ります。\nよろしいですか？')) return;
+  if(!confirm('本当に削除してよいですか？この操作は元に戻せません。')) return;
+  history=[]; savings=0; monthlySummaries=[];
+  LS.set(KEY_HISTORY,history); LS.set(KEY_SAVINGS,savings); LS.set(KEY_SUMMARY,monthlySummaries);
+  renderHome(); renderHistory(); renderSummaryList();
+  showToast('データをリセットしました');
 }
 
 // ════════════════════════════════
@@ -915,14 +941,74 @@ ${summary}
     aiBox.innerHTML = `<div class="ai-box" style="color:var(--danger)">エラー: ${e.message}<br><small>APIキーを確認してください。</small></div>`;
   }
   btn.disabled=false;
+  // 今月分の場合のみ繰越ボタンを表示
+  const d = now();
+  const isCurrentMonth = (reportYear===d.getFullYear() && reportMonth===d.getMonth()+1);
+  document.getElementById('rollover-btn').style.display = (hasData && isCurrentMonth) ? 'block' : 'none';
+}
+
+// ════════════════════════════════
+//  月次繰越
+// ════════════════════════════════
+async function doRollover(){
+  if(!confirm(`${reportYear}年${reportMonth}月の月次繰越を行います。\n\n・各口座の残金を貯金口座に積み立てます\n・記帳履歴はそのまま残ります\n・各口座の今月の使用額がリセットされます\n\nよろしいですか？`)) return;
+
+  // 残金合計を計算
+  const totalRem = wallets.reduce((s,w) => s + (w.budget - spentInMonth(w.name,reportYear,reportMonth)), 0);
+
+  // AI評価テキストを取得（既に表示済みのものを使う）
+  const aiBox = document.getElementById('ai-output');
+  const aiText = aiBox.querySelector('.ai-box')?.innerText || '';
+
+  // 月次サマリに追記
+  const summaryEntry = {
+    year: reportYear,
+    month: reportMonth,
+    wallets: wallets.map(w => ({
+      name: w.name,
+      budget: w.budget,
+      spent: spentInMonth(w.name, reportYear, reportMonth)
+    })),
+    totalRem,
+    aiComment: aiText,
+    ts: Date.now()
+  };
+  // 同月分があれば上書き
+  const existIdx = monthlySummaries.findIndex(s=>s.year===reportYear&&s.month===reportMonth);
+  if(existIdx>=0) monthlySummaries[existIdx]=summaryEntry;
+  else monthlySummaries.push(summaryEntry);
+  monthlySummaries.sort((a,b)=>b.ts-a.ts);
+  LS.set(KEY_SUMMARY, monthlySummaries);
+
+  // 貯金口座に積み立て
+  const prevSavings = savings;
+  savings += totalRem;
+  LS.set(KEY_SAVINGS, savings);
+
+  // 今月の記帳をアーカイブ（履歴は残す）
+  // → 残高は「予算 - spentInMonth」で算出されるため、
+  //   繰越済みフラグを history に付ける形で処理
+  const targetYM = ym(reportYear, reportMonth);
+  history = history.map(h => {
+    if(ym(h.year,h.month)===targetYM) return {...h, rolledOver:true};
+    return h;
+  });
+  // 今月分として新たな空エントリを作るのではなく、
+  // spentThisMonth が rolledOver=true の履歴を除外するよう変更
+  LS.set(KEY_HISTORY, history);
+
+  renderHome(); renderHistory(); renderSummaryList();
+  document.getElementById('rollover-btn').style.display='none';
+  showToast(`¥${fmt(totalRem)} を貯金口座に積み立てました（累計 ¥${fmt(savings)}）`);
 }
 
 // ════════════════════════════════
 //  Export CSV
 // ════════════════════════════════
 function exportCSV(){
+  // 対象月の明細CSV
   const target = ym(reportYear, reportMonth);
-  let csv = `\uFEFF${reportYear}年${reportMonth}月 おこづかい集計\n\n`;
+  let csv = `\uFEFF${reportYear}年${reportMonth}月 おこづかい明細\n\n`;
   csv += '口座名,予算,使用額,残高,使用率\n';
   wallets.forEach(w => {
     const spent = spentInMonth(w.name, reportYear, reportMonth);
@@ -933,17 +1019,47 @@ function exportCSV(){
   csv += '\n記帳履歴\n日付,口座,メモ,金額\n';
   history
     .filter(h => ym(h.year,h.month)===target)
-    .sort((a,b)=>b.ts-a.ts)
+    .sort((a,b)=> new Date(a.year,a.month-1,a.day) - new Date(b.year,b.month-1,b.day))
     .forEach(h => {
       csv += `${h.year}/${String(h.month).padStart(2,'0')}/${String(h.day).padStart(2,'0')},${h.walletName},${h.memo},${h.amount}\n`;
     });
 
+  downloadCSV(csv, `okozukai_detail_${reportYear}${String(reportMonth).padStart(2,'0')}.csv`);
+  showToast('明細CSVを出力しました');
+}
+
+function exportSummaryCSV(){
+  if(!monthlySummaries.length){ showToast('月次サマリがまだありません'); return; }
+  // ヘッダー：年月 + 各口座名 + 残金合計 + 貯金残高（累計） + AI評価
+  const walletNames = [...new Set(monthlySummaries.flatMap(s=>s.wallets.map(w=>w.name)))];
+  let csv = '\uFEFF年月';
+  walletNames.forEach(n => { csv += `,${n}_予算,${n}_使用額,${n}_残高`; });
+  csv += ',残金合計,貯金残高（累計）,AI評価\n';
+
+  // 古い月順に並べる
+  const sorted = [...monthlySummaries].sort((a,b)=> a.year!==b.year ? a.year-b.year : a.month-b.month);
+  let runSavings = 0;
+  sorted.forEach(s => {
+    runSavings += s.totalRem;
+    csv += `${s.year}/${String(s.month).padStart(2,'0')}`;
+    walletNames.forEach(n => {
+      const w = s.wallets.find(w=>w.name===n);
+      if(w){ csv += `,${w.budget},${w.spent},${w.budget-w.spent}`; }
+      else  { csv += ',,,'; }
+    });
+    const comment = (s.aiComment||'').replace(/,/g,'、').replace(/\n/g,' ');
+    csv += `,${s.totalRem},${runSavings},"${comment}"\n`;
+  });
+
+  downloadCSV(csv, 'okozukai_summary.csv');
+  showToast('月次サマリCSVを出力しました');
+}
+
+function downloadCSV(csv, filename){
   const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  a.href=url; a.download=`okozukai_${reportYear}${String(reportMonth).padStart(2,'0')}.csv`;
-  a.click(); URL.revokeObjectURL(url);
-  showToast('CSVを出力しました');
+  a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url);
 }
 
 // ════════════════════════════════
@@ -976,6 +1092,46 @@ document.getElementById('panel-handle').onclick = () => panelOpen ? closePanel()
 // ════════════════════════════════
 //  Nav
 // ════════════════════════════════
+// ════════════════════════════════
+//  月次サマリ一覧
+// ════════════════════════════════
+function renderSummaryList(){
+  const c = document.getElementById('summary-list');
+  if(!c) return;
+  c.innerHTML = '';
+  if(!monthlySummaries.length){
+    c.innerHTML = '<div style="padding:16px;font-size:14px;font-weight:700;color:var(--muted)">月次繰越を行うとここに履歴が表示されます</div>';
+    return;
+  }
+  const sorted = [...monthlySummaries].sort((a,b)=> b.year!==a.year ? b.year-a.year : b.month-a.month);
+  sorted.forEach(s => {
+    const card = document.createElement('div');
+    card.className = 'report-card';
+    card.style.marginBottom = '10px';
+    const rows = s.wallets.map(w => {
+      const pct = w.budget>0?Math.min(100,Math.round(w.spent/w.budget*100)):0;
+      const c2  = pct>=90?'danger':pct>=70?'warn':'ok';
+      return `<div class="report-row">
+        <div class="report-row-name">${w.name}</div>
+        <div class="report-row-right">
+          <span class="report-row-val">¥${fmt(w.spent)}</span>
+          <span class="report-row-sub"> / ¥${fmt(w.budget)}</span>
+        </div>
+      </div>`;
+    }).join('');
+    card.innerHTML = `
+      <div class="report-section" style="background:var(--bg2)">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:16px;font-weight:900">${s.year}年${s.month}月</div>
+          <div style="font-size:14px;font-weight:700;color:var(--ok)">残金 ¥${fmt(s.totalRem)}</div>
+        </div>
+      </div>
+      <div class="report-section">${rows}</div>
+      ${s.aiComment ? `<div class="report-section"><div class="report-sec-label">AI評価</div><div class="ai-box" style="font-size:14px">${s.aiComment.replace(/\n/g,'<br>')}</div></div>` : ''}`;
+    c.appendChild(card);
+  });
+}
+
 function showPage(id, tab){
   if((walletsDirty || apiDirty) && currentPage === 'settings' && id !== 'settings'){
     const leave = window.confirm('設定が保存されていません。\nこのまま移動すると変更が失われます。\n移動しますか？');
@@ -992,7 +1148,7 @@ function showPage(id, tab){
   tab.classList.add('active');
   if(id==='settings') renderSettings();
   if(id==='history')  renderHistory();
-  if(id==='report')   updateReportMonthLabel();
+  if(id==='report'){ updateReportMonthLabel(); renderSummaryList(); }
   closePanel();
 }
 
@@ -1034,6 +1190,7 @@ renderHome();
 renderSelect();
 renderHistory();
 updateReportMonthLabel();
+renderSummaryList();
 </script>
 </body>
 </html>
