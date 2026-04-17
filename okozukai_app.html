@@ -462,7 +462,14 @@ body {
   <div class="panel-handle" id="panel-handle"></div>
   <div class="panel-title">記帳する</div>
   <div class="field-row">
-    <select class="inp-select" id="wallet-select"></select>
+    <select class="inp-select" id="wallet-select" onchange="onWalletSelectChange()"></select>
+  </div>
+  <div id="receipt-btn-wrap" style="display:none;margin-bottom:10px">
+    <button class="q-btn" id="receipt-btn" onclick="document.getElementById('receipt-input').click()" style="width:100%;text-align:center;color:var(--text);border-color:var(--border2)">📷 レシートを読み取る</button>
+    <input type="file" id="receipt-input" accept="image/*" capture="environment" style="display:none" onchange="readReceipt(this)">
+  </div>
+  <div id="receipt-loading" style="display:none;text-align:center;padding:10px 0">
+    <div class="ai-loading" style="justify-content:center"><div class="spinner"></div>レシートを読み取り中...</div>
   </div>
   <div class="quick-row">
     <button class="q-btn" onclick="qa(500)">¥500</button>
@@ -1074,6 +1081,9 @@ function openPanel(){
   const dd = String(today.getDate()).padStart(2,'0');
   document.getElementById('inp-date').value = `${yyyy}-${mm}-${dd}`;
   document.getElementById('add-panel').classList.remove('hidden');
+  // APIキーがある場合のみレシートボタンを表示
+  const apiKey = LS.get(KEY_API);
+  document.getElementById('receipt-btn-wrap').style.display = apiKey ? 'block' : 'none';
 }
 function closePanel(){
   panelOpen=false;
@@ -1083,6 +1093,9 @@ function closePanel(){
   document.getElementById('inp-memo').value='';
   document.getElementById('inp-date').value='';
   document.getElementById('add-tx-btn').disabled=true;
+  document.getElementById('receipt-loading').style.display='none';
+  document.getElementById('receipt-btn-wrap').style.display='none';
+  document.getElementById('receipt-input').value='';
   editingTxId = null;
   document.querySelector('.panel-title').textContent='記帳する';
   document.getElementById('add-tx-btn').textContent='記帳する';
@@ -1172,6 +1185,93 @@ let editingTxId  = null;
 function checkAddBtn(){
   const v = parseInt(document.getElementById('inp-amount').value)||0;
   document.getElementById('add-tx-btn').disabled = v <= 0;
+}
+
+function onWalletSelectChange(){
+  const apiKey = LS.get(KEY_API);
+  const wrap = document.getElementById('receipt-btn-wrap');
+  // 口座が選ばれていてAPIキーがある場合のみレシートボタンを表示
+  wrap.style.display = apiKey ? 'block' : 'none';
+}
+
+async function readReceipt(input){
+  if(!input.files||!input.files[0]) return;
+  const apiKey = LS.get(KEY_API);
+  if(!apiKey){ showToast('APIキーが設定されていません'); return; }
+
+  // ローディング表示
+  document.getElementById('receipt-loading').style.display='block';
+  document.getElementById('receipt-btn-wrap').style.display='none';
+
+  try {
+    // base64変換
+    const base64 = await new Promise((res,rej)=>{
+      const r = new FileReader();
+      r.onload = ()=> res(r.result.split(',')[1]);
+      r.onerror = ()=> rej(new Error('読み込み失敗'));
+      r.readAsDataURL(input.files[0]);
+    });
+
+    // メディアタイプ取得
+    const mediaType = input.files[0].type || 'image/jpeg';
+
+    // Claude APIに送信
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body: JSON.stringify({
+        model:'claude-opus-4-5',
+        max_tokens:300,
+        messages:[{
+          role:'user',
+          content:[
+            {
+              type:'image',
+              source:{ type:'base64', media_type: mediaType, data: base64 }
+            },
+            {
+              type:'text',
+              text:`このレシート画像から以下の情報を読み取り、JSON形式のみで返してください。他のテキストは一切不要です。
+{
+  "total": 合計金額（数値のみ・税込・円記号なし）,
+  "memo": "主な品名をカンマ区切りで3つまで（例：牛乳、食パン、卵）"
+}`
+            }
+          ]
+        }]
+      })
+    });
+
+    const data = await res.json();
+    if(data.error) throw new Error(data.error.message);
+
+    const text = data.content?.find(b=>b.type==='text')?.text||'';
+    const clean = text.replace(/\`\`\`json|\`\`\`/g,'').trim();
+    const parsed = JSON.parse(clean);
+
+    if(parsed.total){
+      document.getElementById('inp-amount').value = parsed.total;
+      checkAddBtn();
+    }
+    if(parsed.memo){
+      document.getElementById('inp-memo').value = parsed.memo;
+    }
+    showToast('レシートを読み取りました');
+
+  } catch(e){
+    showToast('読み取りに失敗しました。手入力してください。');
+    console.error(e);
+  } finally {
+    document.getElementById('receipt-loading').style.display='none';
+    document.getElementById('receipt-btn-wrap').style.display='block';
+    // inputをリセット（同じファイルを再選択できるように）
+    input.value='';
+  }
 }
 function markWalletsDirty(){
   walletsDirty = true;
