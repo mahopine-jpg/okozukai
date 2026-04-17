@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>wallet 使い方ガイド</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f0f0ed;
+  --bg2: #e6e6e2;
+  --surface: #ffffff;
+  --border: #d8d8d4;
+  --text: #1a1a1a;
+  --muted: #888884;
+  --ok: #1a7a4a;
+  --ok-bg: #e6f4ec;
+  --warn: #a05a00;
+  --warn-bg: #fdf0e0;
+  --danger: #c02020;
+  --danger-bg: #fce8e8;
+  --accent: #1a1a1a;
+  --sans: 'Noto Sans JP', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.8;
+  padding-bottom: 60px;
+}
+
+/* ── Header ── */
+.site-header {
+  background: var(--surface);
+  border-bottom: 2px solid var(--border);
+  padding: 20px 24px 16px;
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.site-title { font-size: 20px; font-weight: 900; letter-spacing: -0.5px; }
+.site-sub { font-size: 12px; font-weight: 700; color: var(--muted); margin-top: 2px; }
+.app-link {
+  background: var(--text); color: #fff; text-decoration: none;
+  border-radius: 20px; padding: 8px 16px;
+  font-size: 13px; font-weight: 700; white-space: nowrap;
+  transition: opacity .15s;
+}
+.app-link:active { opacity: .75; }
+
+/* ── TOC ── */
+.toc {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 14px; margin: 20px 16px 0; padding: 18px 20px;
+}
+.toc-title { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 12px; }
+.toc a {
+  display: block; color: var(--text); text-decoration: none;
+  font-size: 14px; font-weight: 700; padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.toc a:last-child { border-bottom: none; }
+.toc a:active { opacity: .6; }
+.toc-num {
+  background: var(--bg2); border-radius: 6px;
+  padding: 1px 8px; font-size: 12px; font-weight: 900;
+  color: var(--muted); flex-shrink: 0;
+}
+
+/* ── Sections ── */
+.section {
+  margin: 24px 16px 0;
+}
+.section-header {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
+}
+.section-num {
+  background: var(--text); color: #fff;
+  border-radius: 8px; padding: 4px 12px;
+  font-size: 12px; font-weight: 900; letter-spacing: 1px; flex-shrink: 0;
+}
+.section-title { font-size: 20px; font-weight: 900; }
+
+/* ── Cards ── */
+.card {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 14px; margin-bottom: 10px; overflow: hidden;
+}
+.card-head {
+  background: var(--bg2); padding: 10px 18px;
+  font-size: 13px; font-weight: 700; color: var(--muted);
+  letter-spacing: 1px; border-bottom: 1px solid var(--border);
+}
+.card-body { padding: 16px 18px; }
+.card-body p { font-size: 15px; font-weight: 500; margin-bottom: 8px; }
+.card-body p:last-child { margin-bottom: 0; }
+
+/* ── Steps ── */
+.steps { list-style: none; padding: 0; }
+.step {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 12px 18px; border-bottom: 1px solid var(--border);
+}
+.step:last-child { border-bottom: none; }
+.step-num {
+  background: var(--text); color: #fff;
+  border-radius: 50%; width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 900; flex-shrink: 0; margin-top: 1px;
+}
+.step-body { flex: 1; }
+.step-title { font-size: 16px; font-weight: 700; margin-bottom: 3px; }
+.step-desc { font-size: 14px; font-weight: 500; color: var(--muted); line-height: 1.7; }
+
+/* ── Tips ── */
+.tip {
+  border-radius: 10px; padding: 12px 16px; margin-bottom: 8px;
+  font-size: 14px; font-weight: 500; line-height: 1.7;
+  display: flex; gap: 10px; align-items: flex-start;
+}
+.tip-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.tip-info { background: #e8f0fe; color: #1a56a0; }
+.tip-warn { background: var(--warn-bg); color: var(--warn); }
+.tip-danger { background: var(--danger-bg); color: var(--danger); }
+.tip-ok { background: var(--ok-bg); color: var(--ok); }
+
+/* ── Table ── */
+.tbl-wrap { overflow-x: auto; margin-bottom: 10px; }
+table {
+  width: 100%; border-collapse: collapse;
+  background: var(--surface); border-radius: 12px; overflow: hidden;
+  border: 1.5px solid var(--border);
+}
+th {
+  background: var(--bg2); padding: 10px 14px;
+  font-size: 13px; font-weight: 700; color: var(--muted);
+  text-align: left; border-bottom: 1px solid var(--border);
+}
+td {
+  padding: 11px 14px; font-size: 14px; font-weight: 500;
+  border-bottom: 1px solid var(--border); vertical-align: top;
+}
+tr:last-child td { border-bottom: none; }
+
+/* ── Status badges ── */
+.badge {
+  display: inline-block; border-radius: 20px; padding: 2px 10px;
+  font-size: 12px; font-weight: 700;
+}
+.badge-ok { background: var(--ok-bg); color: var(--ok); }
+.badge-warn { background: var(--warn-bg); color: var(--warn); }
+.badge-danger { background: var(--danger-bg); color: var(--danger); }
+
+/* ── Monthly flow ── */
+.flow {
+  display: flex; flex-direction: column; gap: 0;
+}
+.flow-item {
+  display: flex; gap: 16px; align-items: stretch;
+}
+.flow-left {
+  display: flex; flex-direction: column; align-items: center; width: 32px; flex-shrink: 0;
+}
+.flow-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--text); flex-shrink: 0; margin-top: 18px;
+}
+.flow-line { width: 2px; background: var(--border); flex: 1; }
+.flow-item:last-child .flow-line { display: none; }
+.flow-card {
+  flex: 1; background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 12px; padding: 14px 16px; margin-bottom: 10px;
+}
+.flow-card-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.flow-card-desc { font-size: 14px; font-weight: 500; color: var(--muted); line-height: 1.7; }
+
+/* ── Important box ── */
+.important {
+  background: var(--text); color: #fff;
+  border-radius: 14px; padding: 18px 20px; margin-bottom: 10px;
+}
+.important-title { font-size: 14px; font-weight: 900; margin-bottom: 10px; letter-spacing: 0.5px; }
+.important-item {
+  display: flex; gap: 10px; font-size: 14px; font-weight: 500;
+  line-height: 1.7; margin-bottom: 6px;
+}
+.important-item:last-child { margin-bottom: 0; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div>
+    <div class="site-title">wallet 使い方ガイド</div>
+    <div class="site-sub">おこづかい管理アプリ</div>
+  </div>
+  <a class="app-link" href="./okozukai_app.html">アプリを開く →</a>
+</header>
+
+<!-- TOC -->
+<nav class="toc" aria-label="目次">
+  <div class="toc-title">目次</div>
+  <a href="#intro"><span class="toc-num">はじめに</span>このアプリでできること</a>
+  <a href="#setup"><span class="toc-num">01</span>最初の準備（初回のみ）</a>
+  <a href="#daily"><span class="toc-num">02</span>毎日の使い方</a>
+  <a href="#fix"><span class="toc-num">03</span>記帳を間違えたとき</a>
+  <a href="#monthly"><span class="toc-num">04</span>月末にやること</a>
+  <a href="#trouble"><span class="toc-num">05</span>困ったときは</a>
+  <a href="#caution"><span class="toc-num">注意</span>大切なこと</a>
+</nav>
+
+<!-- はじめに -->
+<section class="section" id="intro">
+  <div class="section-header">
+    <div class="section-title">このアプリでできること</div>
+  </div>
+  <div class="card">
+    <div class="card-body">
+      <p>毎月のおこづかいを用途別に管理するアプリです。食費・交通費・趣味など、使い道ごとに予算を決めて、日々の支出を記録するだけで「今いくら使えるか」がひと目でわかります。</p>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head">残高の見方</div>
+    <div class="card-body">
+      <p><span class="badge badge-ok">緑</span> 余裕あり（予算の70%未満）</p>
+      <p><span class="badge badge-warn">オレンジ</span> 注意（70〜89%使用）</p>
+      <p><span class="badge badge-danger">赤</span> 残りわずか（90%以上使用）</p>
+    </div>
+  </div>
+</section>
+
+<!-- 01 最初の準備 -->
+<section class="section" id="setup">
+  <div class="section-header">
+    <div class="section-num">01</div>
+    <div class="section-title">最初の準備（初回のみ）</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">ホーム画面に追加する（おすすめ）</div>
+    <ul class="steps">
+      <li class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Safariで開く</div>
+          <div class="step-desc">お母さんから受け取ったURLをSafariで開く</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">共有ボタンをタップ</div>
+          <div class="step-desc">画面下の□から↑が出ているアイコンをタップ</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">「ホーム画面に追加」をタップ</div>
+          <div class="step-desc">「追加」をタップして完了</div>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <div class="tip tip-warn">
+    <div class="tip-icon">⚠️</div>
+    <div>ブラウザで開いた場合とホーム画面から開いた場合でデータが別々になります。どちらか一方だけを使うようにしてください。</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">口座と予算を設定する</div>
+    <ul class="steps">
+      <li class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">「設定」タブをタップ</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">口座名・予算額を自分用に書き換える</div>
+          <div class="step-desc">例：食費・交通費・日用品・趣味・被服・医療・交際費・雑費</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">「＋ 口座を追加」で口座を増やせる</div>
+          <div class="step-desc">不要な口座は右の「×」で削除</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">「口座設定を保存」をタップ</div>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="card-head">APIキーを入力する（AI評価を使う場合）</div>
+    <ul class="steps">
+      <li class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">設定画面の「Claude API キー」欄を開く</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">お母さんから受け取ったAPIキーを貼り付ける</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">「APIキーを保存」をタップ</div>
+        </div>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- 02 毎日の使い方 -->
+<section class="section" id="daily">
+  <div class="section-header">
+    <div class="section-num">02</div>
+    <div class="section-title">毎日の使い方</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">お金を使ったら記帳する</div>
+    <ul class="steps">
+      <li class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">使った口座のカードをタップ</div>
+          <div class="step-desc">ホーム画面の口座カードをタップすると、その口座が選択された状態で記帳パネルが開きます</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">金額を入力する</div>
+          <div class="step-desc">クイックボタン（¥500〜¥10,000）か直接入力</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">「記帳する」をタップ</div>
+          <div class="step-desc">ホームの残高がすぐに更新されます</div>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <div class="tip tip-info">
+    <div class="tip-icon">💡</div>
+    <div><strong>メモ</strong>（スーパー・電車代など）を入れておくと後から見返しやすいです。</div>
+  </div>
+  <div class="tip tip-info">
+    <div class="tip-icon">💡</div>
+    <div><strong>日付</strong>はデフォルトで今日になっています。昨日以前の分も日付を変えて記帳できます。</div>
+  </div>
+</section>
+
+<!-- 03 間違えたとき -->
+<section class="section" id="fix">
+  <div class="section-header">
+    <div class="section-num">03</div>
+    <div class="section-title">記帳を間違えたとき</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">修正する</div>
+    <ul class="steps">
+      <li class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">「履歴」タブをタップ</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">修正したい記帳の ✎ をタップ</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">金額・メモ・日付・口座を修正する</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">「修正を保存する」をタップ</div>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="card-head">削除する</div>
+    <ul class="steps">
+      <li class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">「履歴」タブをタップ</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">削除したい記帳の × をタップ</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">確認ダイアログで「OK」をタップ</div>
+        </div>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- 04 月末にやること -->
+<section class="section" id="monthly">
+  <div class="section-header">
+    <div class="section-num">04</div>
+    <div class="section-title">月末にやること</div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-item">
+      <div class="flow-left"><div class="flow-dot"></div><div class="flow-line"></div></div>
+      <div class="flow-card">
+        <div class="flow-card-title">① 集計とAI評価を見る</div>
+        <div class="flow-card-desc">「集計」タブ → 「集計してAI評価を出す」をタップ。口座ごとの使用状況とAIからのアドバイスが表示されます。</div>
+      </div>
+    </div>
+    <div class="flow-item">
+      <div class="flow-left"><div class="flow-dot"></div><div class="flow-line"></div></div>
+      <div class="flow-card">
+        <div class="flow-card-title">② 月次繰越する</div>
+        <div class="flow-card-desc">「🏦 月次繰越する（貯金口座に積み立て）」をタップ。今月の残金が貯金口座に積み立てられ、各口座が来月の予算額にリセットされます。記帳履歴はそのまま残ります。</div>
+      </div>
+    </div>
+    <div class="flow-item">
+      <div class="flow-left"><div class="flow-dot"></div><div class="flow-line"></div></div>
+      <div class="flow-card">
+        <div class="flow-card-title">③ 明細CSVを保存する（任意）</div>
+        <div class="flow-card-desc">「📥 Excelに出力（CSV）」で今月の記帳明細をファイルに保存できます。</div>
+      </div>
+    </div>
+    <div class="flow-item">
+      <div class="flow-left"><div class="flow-dot"></div><div class="flow-line"></div></div>
+      <div class="flow-card">
+        <div class="flow-card-title">④ 月次サマリCSVを保存する（任意）</div>
+        <div class="flow-card-desc">「📊 月次サマリCSVを出力（全月分）」で、これまでの全月分の集計とAI評価を1ファイルにまとめて保存できます。</div>
+      </div>
+    </div>
+    <div class="flow-item">
+      <div class="flow-left"><div class="flow-dot"></div></div>
+      <div class="flow-card">
+        <div class="flow-card-title">⑤ 新しい月のスタート！</div>
+        <div class="flow-card-desc">全口座の残高が予算額に戻っています。貯金口座にも今月の残金が積み立てられました。今月も頑張ろう！</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 05 困ったとき -->
+<section class="section" id="trouble">
+  <div class="section-header">
+    <div class="section-num">05</div>
+    <div class="section-title">困ったときは</div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>困ったこと</th><th>対応</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>口座の予算を変えたい</td><td>設定 → 口座一覧で編集 → 保存</td></tr>
+        <tr><td>口座を増やしたい・減らしたい</td><td>設定 → ＋追加 または ×削除 → 保存</td></tr>
+        <tr><td>先月の記帳を見たい</td><td>履歴タブ（全件表示されます）</td></tr>
+        <tr><td>先月の集計・AI評価を見たい</td><td>集計タブ下部の「月次サマリ履歴」に表示されます</td></tr>
+        <tr><td>貯金がいくら貯まったか確認したい</td><td>ホーム画面の「🏦 貯金口座」カードを確認</td></tr>
+        <tr><td>全月分の集計をExcelで見たい</td><td>集計タブ → 「📊 月次サマリCSVを出力」</td></tr>
+        <tr><td>AI評価でエラーが出る</td><td>少し待ってから再度タップ。それでもダメならお母さんに連絡</td></tr>
+        <tr><td>開いたらデータがない</td><td>ブラウザとホーム画面アプリを混在させていないか確認。どちらか一方に統一する</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 注意 -->
+<section class="section" id="caution">
+  <div class="section-header">
+    <div class="section-title">大切なこと</div>
+  </div>
+  <div class="important">
+    <div class="important-title">⚠ 注意事項</div>
+    <div class="important-item"><span>📱</span><span>データはこのスマホの中だけに保存されています。機種変更の前にCSV出力で記録を残しておきましょう。</span></div>
+    <div class="important-item"><span>🗑</span><span>アプリ（ホーム画面アイコン）を削除するとデータも消えます。間違えて削除しないよう注意してください。</span></div>
+    <div class="important-item"><span>📊</span><span>月次繰越を忘れると貯金口座に積み立てられません。月末に必ず実行してください。</span></div>
+    <div class="important-item"><span>🔑</span><span>APIキーは大切に。他の人には教えないようにしてください。</span></div>
+  </div>
+</section>
+
+</body>
+</html>
