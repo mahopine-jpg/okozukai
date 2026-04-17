@@ -171,6 +171,7 @@ body {
   border-radius: 10px; color: var(--text); font-family: var(--sans);
   font-size: 16px; font-weight: 700; padding: 12px 14px;
   outline: none; transition: border-color .15s; margin-bottom: 10px;
+  box-sizing: border-box; display: block;
 }
 .inp-memo:focus { border-color: var(--text); }
 .quick-row { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
@@ -469,7 +470,7 @@ body {
   </div>
   <div id="receipt-btn-wrap" style="display:none;margin-bottom:10px">
     <button class="q-btn" id="receipt-btn" onclick="document.getElementById('receipt-input').click()" style="width:100%;text-align:center;color:var(--text);border-color:var(--border2)">📷 レシートを読み取る</button>
-    <input type="file" id="receipt-input" accept="image/*" capture="environment" style="display:none" onchange="readReceipt(this)">
+    <input type="file" id="receipt-input" accept="image/*" style="display:none" onchange="readReceipt(this)">
   </div>
   <div id="receipt-loading" style="display:none;text-align:center;padding:10px 0">
     <div class="ai-loading" style="justify-content:center"><div class="spinner"></div>レシートを読み取り中...</div>
@@ -1241,8 +1242,9 @@ async function readReceipt(input){
               type:'text',
               text:`このレシート画像から以下の情報を読み取り、JSON形式のみで返してください。他のテキストは一切不要です。
 {
-  "total": 合計金額（数値のみ・税込・円記号なし）,
-  "memo": "主な品名をカンマ区切りで3つまで（例：牛乳、食パン、卵）"
+  "total": 合計金額（数値のみ・税込・円記号なし。合計が読み取れない場合はnull）,
+  "memo": "主な品名をカンマ区切りで3つまで（例：牛乳、食パン、卵）",
+  "date": "レシートの日付（YYYY-MM-DD形式。読み取れない場合はnull）"
 }`
             }
           ]
@@ -1263,6 +1265,9 @@ async function readReceipt(input){
     }
     if(parsed.memo){
       document.getElementById('inp-memo').value = parsed.memo;
+    }
+    if(parsed.date){
+      document.getElementById('inp-date').value = parsed.date;
     }
     showToast('レシートを読み取りました');
 
