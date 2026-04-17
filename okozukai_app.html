@@ -139,8 +139,10 @@ body {
   padding: 14px 20px 40px; z-index: 200;
   transition: transform .3s cubic-bezier(.4,0,.2,1);
   max-height: 92vh;
+  overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
 }
 .add-panel.hidden { transform: translate(-50%, calc(100% - 70px)); }
 .panel-handle {
@@ -488,7 +490,7 @@ body {
     <input type="number" class="inp-amount" id="inp-amount" placeholder="0" inputmode="numeric" oninput="checkAddBtn()" style="flex:1;min-width:0;width:100%">
   </div>
   <input type="text" class="inp-memo" id="inp-memo" placeholder="メモ（任意）">
-  <input type="date" class="inp-memo" id="inp-date" style="margin-bottom:10px;width:100%;min-width:0">
+  <input type="date" class="inp-memo" id="inp-date" style="margin-bottom:10px;width:100%;min-width:0;box-sizing:border-box;display:block;max-width:100%">
   <button class="add-btn" id="add-tx-btn" onclick="addTx()" disabled>記帳する</button>
 </div>
 
