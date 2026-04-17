@@ -305,7 +305,7 @@ tr:last-child td { border-bottom: none; }
   </div>
 
   <div class="card">
-    <div class="card-head">APIキーを入力する（AI評価を使う場合）</div>
+    <div class="card-head">APIキーを入力する（AI評価・レシート読み取りを使う場合）</div>
     <ul class="steps">
       <li class="step">
         <div class="step-num">1</div>
@@ -323,6 +323,7 @@ tr:last-child td { border-bottom: none; }
         <div class="step-num">3</div>
         <div class="step-body">
           <div class="step-title">「APIキーを保存」をタップ</div>
+          <div class="step-desc">保存するとレシート読み取りボタンと月末のAI評価が使えるようになります</div>
         </div>
       </li>
     </ul>
@@ -358,6 +359,32 @@ tr:last-child td { border-bottom: none; }
         <div class="step-body">
           <div class="step-title">「記帳する」をタップ</div>
           <div class="step-desc">ホームの残高がすぐに更新されます</div>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="card-head">📷 レシートから読み取る（APIキー設定済みの場合）</div>
+    <ul class="steps">
+      <li class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">口座を選ぶと「📷 レシートを読み取る」ボタンが出現</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">ボタンをタップしてカメラまたはライブラリから画像を選ぶ</div>
+          <div class="step-desc">レシート・ネットショッピングの納品書など幅広く対応しています</div>
+        </div>
+      </li>
+      <li class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">合計金額・品名・日付が自動で入力される</div>
+          <div class="step-desc">内容を確認・修正して「記帳する」をタップ</div>
         </div>
       </li>
     </ul>
@@ -499,6 +526,8 @@ tr:last-child td { border-bottom: none; }
         <tr><td>先月の集計・AI評価を見たい</td><td>集計タブ下部の「月次サマリ履歴」に表示されます</td></tr>
         <tr><td>貯金がいくら貯まったか確認したい</td><td>ホーム画面の「🏦 貯金口座」カードを確認</td></tr>
         <tr><td>全月分の集計をExcelで見たい</td><td>集計タブ → 「📊 月次サマリCSVを出力」</td></tr>
+        <tr><td>レシートを読み取るボタンが出ない</td><td>設定タブでAPIキーが保存されているか確認</td></tr>
+        <tr><td>レシートの読み取り結果が違う</td><td>金額・メモ・日付は手動で修正できます</td></tr>
         <tr><td>AI評価でエラーが出る</td><td>少し待ってから再度タップ。それでもダメならお母さんに連絡</td></tr>
         <tr><td>開いたらデータがない</td><td>ブラウザとホーム画面アプリを混在させていないか確認。どちらか一方に統一する</td></tr>
       </tbody>
