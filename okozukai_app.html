@@ -480,6 +480,7 @@ body {
       <div style="padding:14px;display:flex;flex-direction:column;gap:8px">
         <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:4px">月次繰越は「集計」タブから行ってください</div>
         <button class="reset-btn" onclick="resetAllData()">⚠ すべてのデータをリセット（初期化）</button>
+        <button class="reset-btn" onclick="resetEverything()" style="margin-top:4px">🗑 完全リセット（APIキー・口座設定も含む）</button>
       </div>
     </div>
 
@@ -994,6 +995,20 @@ function resetAllData(){
   LS.set(KEY_HISTORY,history); LS.set(KEY_SAVINGS,savings); LS.set(KEY_SUMMARY,monthlySummaries);
   renderHome(); renderHistory(); renderSummaryList();
   showToast('データをリセットしました');
+}
+
+function resetEverything(){
+  if(!confirm('すべてのデータ（記帳履歴・貯金・月次サマリ・口座設定・APIキー）を完全に削除します。\nデフォルトの状態に戻ります。\nよろしいですか？')) return;
+  if(!confirm('本当に削除してよいですか？この操作は元に戻せません。')) return;
+  localStorage.clear();
+  history=[]; savings=0; monthlySummaries=[];
+  wallets = [
+    {name:'代表口座(デビット用)', budget:37500},
+    {name:'財布(現金)',           budget:0},
+    {name:'PayPay',              budget:0},
+  ];
+  renderHome(); renderHistory(); renderSummaryList(); renderSelect(); renderSettings();
+  showToast('完全リセットしました');
 }
 
 // ════════════════════════════════
