@@ -126,6 +126,28 @@ body {
   transition: color .1s;
 }
 .h-del:active { color: var(--danger); }
+.h-tag-transfer { background: #e8f0fe; color: #1a4a8a; }
+.h-amount-in { font-size: 18px; font-weight: 900; color: var(--ok); }
+
+/* ── Panel tabs ── */
+.panel-tab-row {
+  display: flex; background: var(--bg2); border-radius: 10px; padding: 3px;
+  margin-bottom: 12px; gap: 3px;
+}
+.panel-tab {
+  flex: 1; text-align: center; padding: 9px 0;
+  font-size: 14px; font-weight: 700; color: var(--muted);
+  border-radius: 8px; cursor: pointer; transition: all .15s;
+  user-select: none;
+}
+.panel-tab.active {
+  background: var(--surface); color: var(--text);
+  border: 1.5px solid var(--border);
+}
+.transfer-arrow {
+  font-size: 20px; color: var(--muted); flex-shrink: 0;
+  align-self: center; padding: 0 2px;
+}
 .empty-msg {
   padding: 48px 20px; text-align: center;
   font-size: 16px; font-weight: 700; color: var(--muted);
@@ -467,33 +489,65 @@ body {
 <div class="add-panel hidden" id="add-panel">
   <div class="panel-handle" id="panel-handle"></div>
   <div class="panel-title">記帳する</div>
-  <div class="field-row">
-    <select class="inp-select" id="wallet-select" onchange="onWalletSelectChange()"></select>
+
+  <!-- タブ切り替え -->
+  <div class="panel-tab-row">
+    <div class="panel-tab active" id="tab-expense" onclick="switchPanelTab('expense')">支出</div>
+    <div class="panel-tab" id="tab-transfer" onclick="switchPanelTab('transfer')">口座移動</div>
   </div>
-  <div id="receipt-btn-wrap" style="display:none;margin-bottom:10px">
-    <button class="q-btn" id="receipt-btn" onclick="document.getElementById('receipt-input').click()" style="width:100%;text-align:center;color:var(--text);border-color:var(--border2)">📷 レシートを読み取る</button>
-    <input type="file" id="receipt-input" accept="image/*" style="display:none" onchange="readReceipt(this)">
+
+  <!-- 支出フォーム -->
+  <div id="expense-form">
+    <div class="field-row">
+      <select class="inp-select" id="wallet-select" onchange="onWalletSelectChange()"></select>
+    </div>
+    <div id="receipt-btn-wrap" style="display:none;margin-bottom:10px">
+      <button class="q-btn" id="receipt-btn" onclick="document.getElementById('receipt-input').click()" style="width:100%;text-align:center;color:var(--text);border-color:var(--border2)">📷 レシートを読み取る</button>
+      <input type="file" id="receipt-input" accept="image/*" style="display:none" onchange="readReceipt(this)">
+    </div>
+    <div id="receipt-loading" style="display:none;text-align:center;padding:10px 0">
+      <div class="ai-loading" style="justify-content:center"><div class="spinner"></div>レシートを読み取り中...</div>
+    </div>
+    <div class="quick-row">
+      <button class="q-btn" onclick="qa(500)">¥500</button>
+      <button class="q-btn" onclick="qa(1000)">¥1,000</button>
+      <button class="q-btn" onclick="qa(2000)">¥2,000</button>
+      <button class="q-btn" onclick="qa(3000)">¥3,000</button>
+      <button class="q-btn" onclick="qa(5000)">¥5,000</button>
+      <button class="q-btn" onclick="qa(10000)">¥10,000</button>
+    </div>
+    <div class="field-row" style="align-items:center">
+      <span class="yen" style="flex-shrink:0">¥</span>
+      <input type="number" class="inp-amount" id="inp-amount" placeholder="0" inputmode="numeric" oninput="checkAddBtn()" style="flex:1;min-width:0;width:100%">
+    </div>
+    <input type="text" class="inp-memo" id="inp-memo" placeholder="メモ（任意）">
+    <input type="date" class="inp-memo" id="inp-date" style="margin-bottom:10px;width:100%;min-width:0;box-sizing:border-box;display:block;max-width:100%">
+    <button class="add-btn" id="add-tx-btn" onclick="addTx()" disabled>記帳する</button>
   </div>
-  <div id="receipt-loading" style="display:none;text-align:center;padding:10px 0">
-    <div class="ai-loading" style="justify-content:center"><div class="spinner"></div>レシートを読み取り中...</div>
+
+  <!-- 口座移動フォーム -->
+  <div id="transfer-form" style="display:none">
+    <div class="field-row" style="align-items:center">
+      <select class="inp-select" id="transfer-from"></select>
+      <span class="transfer-arrow">→</span>
+      <select class="inp-select" id="transfer-to"></select>
+    </div>
+    <div class="quick-row">
+      <button class="q-btn" onclick="qt(500)">¥500</button>
+      <button class="q-btn" onclick="qt(1000)">¥1,000</button>
+      <button class="q-btn" onclick="qt(2000)">¥2,000</button>
+      <button class="q-btn" onclick="qt(3000)">¥3,000</button>
+      <button class="q-btn" onclick="qt(5000)">¥5,000</button>
+      <button class="q-btn" onclick="qt(10000)">¥10,000</button>
+    </div>
+    <div class="field-row" style="align-items:center">
+      <span class="yen" style="flex-shrink:0">¥</span>
+      <input type="number" class="inp-amount" id="transfer-amount" placeholder="0" inputmode="numeric" oninput="checkTransferBtn()" style="flex:1;min-width:0;width:100%">
+    </div>
+    <input type="text" class="inp-memo" id="transfer-memo" placeholder="メモ（任意・例：PayPayにチャージ）">
+    <input type="date" class="inp-memo" id="transfer-date" style="margin-bottom:10px;width:100%;min-width:0;box-sizing:border-box;display:block;max-width:100%">
+    <button class="add-btn" id="add-transfer-btn" onclick="addTransfer()" disabled>移動する</button>
   </div>
-  <div class="quick-row">
-    <button class="q-btn" onclick="qa(500)">¥500</button>
-    <button class="q-btn" onclick="qa(1000)">¥1,000</button>
-    <button class="q-btn" onclick="qa(2000)">¥2,000</button>
-    <button class="q-btn" onclick="qa(3000)">¥3,000</button>
-    <button class="q-btn" onclick="qa(5000)">¥5,000</button>
-    <button class="q-btn" onclick="qa(10000)">¥10,000</button>
-  </div>
-  <div class="field-row" style="align-items:center">
-    <span class="yen" style="flex-shrink:0">¥</span>
-    <input type="number" class="inp-amount" id="inp-amount" placeholder="0" inputmode="numeric" oninput="checkAddBtn()" style="flex:1;min-width:0;width:100%">
-  </div>
-  <input type="text" class="inp-memo" id="inp-memo" placeholder="メモ（任意）">
-  <div class="field-row" style="margin-bottom:10px">
-    <input type="date" class="inp-amount" id="inp-date" style="flex:1;min-width:0;width:100%;font-size:16px;font-weight:700;text-align:left">
-  </div>
-  <button class="add-btn" id="add-tx-btn" onclick="addTx()" disabled>記帳する</button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -555,17 +609,22 @@ function spentThisMonth(walletName){
   const cym = currentYM();
   return history
     .filter(h => h.walletName === walletName && ym(h.year,h.month) === cym && !h.rolledOver)
-    .reduce((s,h) => s+h.amount, 0);
+    .reduce((s,h) => {
+      if(h.type==='transfer' && h.transferDir==='in') return s - h.amount;
+      return s + h.amount;
+    }, 0);
 }
 // spent for a wallet name in given year/month
 function spentInMonth(walletName, y, m){
   const target = ym(y,m);
-  // 集計・繰越済みの月はrolledOverに関わらず全件対象
   const cym = currentYM();
   const isCurrentMonth = target === cym;
   return history
     .filter(h => h.walletName === walletName && ym(h.year,h.month) === target && (isCurrentMonth ? !h.rolledOver : true))
-    .reduce((s,h) => s+h.amount, 0);
+    .reduce((s,h) => {
+      if(h.type==='transfer' && h.transferDir==='in') return s - h.amount;
+      return s + h.amount;
+    }, 0);
 }
 
 // ════════════════════════════════
@@ -647,17 +706,34 @@ function renderHistory(){
     const d = document.createElement('div');
     d.className = 'h-item';
     const dateStr = `${String(h.month).padStart(2,'0')}/${String(h.day).padStart(2,'0')}`;
+    const isTransfer = h.type === 'transfer';
+    const isIn = isTransfer && h.transferDir === 'in';
+    let tagLabel, tagClass, amountHtml, delBtn;
+    if(isTransfer){
+      tagLabel = isIn ? `移動 ← ${h.transferPeerName}` : `移動 → ${h.transferPeerName}`;
+      tagClass = 'h-tag h-tag-transfer';
+      amountHtml = isIn
+        ? `<div class="h-amount-in">+¥${fmt(h.amount)}</div>`
+        : `<div class="h-amount">−¥${fmt(h.amount)}</div>`;
+      // 移動はペアごとに削除
+      delBtn = isIn ? '' : `<button class="h-del" onclick="deleteTransfer('${h.id}',event)" title="削除">×</button>`;
+    } else {
+      tagLabel = h.walletName;
+      tagClass = 'h-tag';
+      amountHtml = `<div class="h-amount">−¥${fmt(h.amount)}</div>`;
+      delBtn = `<button class="h-del" onclick="editTx('${h.id}',event)" title="編集">✎</button>
+                <button class="h-del" onclick="deleteTx('${h.id}',event)" title="削除">×</button>`;
+    }
     d.innerHTML = `
       <div class="h-left">
-        <span class="h-tag">${h.walletName}</span>
+        <span class="${tagClass}">${tagLabel}</span>
         <div class="h-memo">${h.memo||h.walletName}</div>
       </div>
       <div class="h-right">
-        <div class="h-amount">−¥${fmt(h.amount)}</div>
+        ${amountHtml}
         <div style="display:flex;align-items:center;gap:6px">
           <div class="h-date">${h.year}/${dateStr}</div>
-          <button class="h-del" onclick="editTx('${h.id}',event)" title="編集">✎</button>
-          <button class="h-del" onclick="deleteTx('${h.id}',event)" title="削除">×</button>
+          ${delBtn}
         </div>
       </div>`;
     c.appendChild(d);
@@ -668,14 +744,93 @@ function renderHistory(){
 //  Add / Delete transaction
 // ════════════════════════════════
 function renderSelect(){
-  const sel = document.getElementById('wallet-select');
-  sel.innerHTML = wallets.map((w,i)=>`<option value="${i}">${w.name}</option>`).join('');
+  const opts = wallets.map((w,i)=>`<option value="${i}">${w.name}</option>`).join('');
+  document.getElementById('wallet-select').innerHTML = opts;
+  document.getElementById('transfer-from').innerHTML = opts;
+  // 移動先は2番目の口座をデフォルト選択
+  const toOpts = wallets.map((w,i)=>`<option value="${i}"${i===1?' selected':''}>${w.name}</option>`).join('');
+  document.getElementById('transfer-to').innerHTML = toOpts;
 }
 
 function qa(v){
   document.getElementById('inp-amount').value=v;
   document.getElementById('inp-amount').focus();
   checkAddBtn();
+}
+
+// ────────────────────────────────
+//  Panel tab switch
+// ────────────────────────────────
+let currentPanelTab = 'expense';
+function switchPanelTab(tab){
+  currentPanelTab = tab;
+  document.getElementById('expense-form').style.display = tab==='expense' ? 'block' : 'none';
+  document.getElementById('transfer-form').style.display = tab==='transfer' ? 'block' : 'none';
+  document.getElementById('tab-expense').classList.toggle('active', tab==='expense');
+  document.getElementById('tab-transfer').classList.toggle('active', tab==='transfer');
+  document.querySelector('.panel-title').textContent = tab==='expense' ? '記帳する' : '口座移動';
+}
+
+// ────────────────────────────────
+//  Transfer helpers
+// ────────────────────────────────
+function qt(v){
+  document.getElementById('transfer-amount').value=v;
+  document.getElementById('transfer-amount').focus();
+  checkTransferBtn();
+}
+function checkTransferBtn(){
+  const v = parseInt(document.getElementById('transfer-amount').value)||0;
+  document.getElementById('add-transfer-btn').disabled = v <= 0;
+}
+
+function addTransfer(){
+  const fromIdx  = parseInt(document.getElementById('transfer-from').value);
+  const toIdx    = parseInt(document.getElementById('transfer-to').value);
+  const amount   = parseInt(document.getElementById('transfer-amount').value)||0;
+  const memo     = document.getElementById('transfer-memo').value.trim();
+  const dateVal  = document.getElementById('transfer-date').value;
+  if(amount<=0){ document.getElementById('transfer-amount').focus(); return; }
+  if(fromIdx===toIdx){ showToast('移動元と移動先が同じです'); return; }
+  if(!wallets[fromIdx]||!wallets[toIdx]) return;
+
+  const d = dateVal ? new Date(dateVal+'T00:00:00') : now();
+  const pairId = Date.now().toString(36)+Math.random().toString(36).slice(2);
+  const outId  = pairId+'_out';
+  const inId   = pairId+'_in';
+  const defaultMemo = memo || `${wallets[fromIdx].name}→${wallets[toIdx].name}`;
+
+  const txOut = {
+    id: outId, type:'transfer', transferDir:'out',
+    transferPairId: pairId, transferPeerName: wallets[toIdx].name,
+    walletName: wallets[fromIdx].name,
+    memo: defaultMemo, amount,
+    year: d.getFullYear(), month: d.getMonth()+1, day: d.getDate(), ts: d.getTime()
+  };
+  const txIn = {
+    id: inId, type:'transfer', transferDir:'in',
+    transferPairId: pairId, transferPeerName: wallets[fromIdx].name,
+    walletName: wallets[toIdx].name,
+    memo: defaultMemo, amount,
+    year: d.getFullYear(), month: d.getMonth()+1, day: d.getDate(), ts: d.getTime()
+  };
+  history.push(txOut, txIn);
+  LS.set(KEY_HISTORY, history);
+  renderHome(); renderHistory();
+  closePanel();
+  showToast(`${wallets[fromIdx].name}→${wallets[toIdx].name} ¥${fmt(amount)} 移動しました`);
+}
+
+function deleteTransfer(outId, e){
+  e.stopPropagation();
+  const tx = history.find(h=>h.id===outId);
+  if(!tx) return;
+  if(!confirm('この口座移動を削除しますか？\n（2件まとめて削除されます）')) return;
+  const pairId = tx.transferPairId;
+  history = history.filter(h=>h.transferPairId!==pairId);
+  LS.set(KEY_HISTORY, history);
+  renderHistory(); renderHome();
+  showToast('口座移動を削除しました');
 }
 
 function addTx(){
@@ -1031,12 +1186,14 @@ function exportCSV(){
     const pct   = w.budget>0 ? Math.round(spent/w.budget*100) : 0;
     csv += `${w.name},${w.budget},${spent},${rem},${pct}%\n`;
   });
-  csv += '\n記帳履歴\n日付,口座,メモ,金額\n';
+  csv += '\n記帳履歴\n日付,口座,メモ,金額,種別\n';
   history
     .filter(h => ym(h.year,h.month)===target)
     .sort((a,b)=> new Date(a.year,a.month-1,a.day) - new Date(b.year,b.month-1,b.day))
     .forEach(h => {
-      csv += `${h.year}/${String(h.month).padStart(2,'0')}/${String(h.day).padStart(2,'0')},${h.walletName},${h.memo},${h.amount}\n`;
+      const kind = h.type==='transfer' ? (h.transferDir==='out'?`移動→${h.transferPeerName}`:`移動←${h.transferPeerName}`) : '支出';
+      const sign = (h.type==='transfer'&&h.transferDir==='in') ? h.amount : -h.amount;
+      csv += `${h.year}/${String(h.month).padStart(2,'0')}/${String(h.day).padStart(2,'0')},${h.walletName},${h.memo},${sign},${kind}\n`;
     });
 
   downloadCSV(csv, `okozukai_detail_${reportYear}${String(reportMonth).padStart(2,'0')}.csv`);
@@ -1087,7 +1244,9 @@ function openPanel(){
   const yyyy = today.getFullYear();
   const mm = String(today.getMonth()+1).padStart(2,'0');
   const dd = String(today.getDate()).padStart(2,'0');
-  document.getElementById('inp-date').value = `${yyyy}-${mm}-${dd}`;
+  const todayStr = `${yyyy}-${mm}-${dd}`;
+  document.getElementById('inp-date').value = todayStr;
+  document.getElementById('transfer-date').value = todayStr;
   document.getElementById('add-panel').classList.remove('hidden');
   // APIキーがある場合のみレシートボタンを表示
   const apiKey = LS.get(KEY_API);
@@ -1104,6 +1263,13 @@ function closePanel(){
   document.getElementById('receipt-loading').style.display='none';
   document.getElementById('receipt-btn-wrap').style.display='none';
   document.getElementById('receipt-input').value='';
+  // 移動フォームリセット
+  document.getElementById('transfer-amount').value='';
+  document.getElementById('transfer-memo').value='';
+  document.getElementById('transfer-date').value='';
+  document.getElementById('add-transfer-btn').disabled=true;
+  // タブを支出に戻す
+  switchPanelTab('expense');
   editingTxId = null;
   document.querySelector('.panel-title').textContent='記帳する';
   document.getElementById('add-tx-btn').textContent='記帳する';
