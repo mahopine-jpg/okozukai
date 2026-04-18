@@ -195,7 +195,8 @@ body {
   border-radius: 10px; color: var(--text); font-family: var(--sans);
   font-size: 16px; font-weight: 700; padding: 12px 14px;
   outline: none; transition: border-color .15s; margin-bottom: 10px;
-  box-sizing: border-box; display: block;
+  box-sizing: border-box; display: block; max-width: 100%;
+  -webkit-appearance: none; appearance: none;
 }
 .inp-memo:focus { border-color: var(--text); }
 .quick-row { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
@@ -521,7 +522,7 @@ body {
       <input type="number" class="inp-amount" id="inp-amount" placeholder="0" inputmode="numeric" oninput="checkAddBtn()" style="flex:1;min-width:0;width:100%">
     </div>
     <input type="text" class="inp-memo" id="inp-memo" placeholder="メモ（任意）">
-    <input type="date" class="inp-memo" id="inp-date" style="margin-bottom:10px;width:100%;min-width:0;box-sizing:border-box;display:block;max-width:100%">
+    <input type="date" class="inp-memo" id="inp-date" style="margin-bottom:10px">
     <button class="add-btn" id="add-tx-btn" onclick="addTx()" disabled>記帳する</button>
   </div>
 
@@ -545,7 +546,7 @@ body {
       <input type="number" class="inp-amount" id="transfer-amount" placeholder="0" inputmode="numeric" oninput="checkTransferBtn()" style="flex:1;min-width:0;width:100%">
     </div>
     <input type="text" class="inp-memo" id="transfer-memo" placeholder="メモ（任意・例：PayPayにチャージ）">
-    <input type="date" class="inp-memo" id="transfer-date" style="margin-bottom:10px;width:100%;min-width:0;box-sizing:border-box;display:block;max-width:100%">
+    <input type="date" class="inp-memo" id="transfer-date" style="margin-bottom:10px">
     <button class="add-btn" id="add-transfer-btn" onclick="addTransfer()" disabled>移動する</button>
   </div>
 </div>
