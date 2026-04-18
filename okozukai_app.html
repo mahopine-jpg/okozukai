@@ -573,12 +573,9 @@ const KEY_SUMMARY  = 'wlt_summary';   // 月次サマリ履歴
 //  State
 // ════════════════════════════════
 let wallets = LS.get(KEY_WALLETS) || [
-  {name:'代表口座',     budget:15000},
-  {name:'財布（現金）', budget:10000},
-  {name:'PayPay',      budget:10000},
-  {name:'Suica',       budget:2500},
-  {name:'被服費',       budget:5000},
-  {name:'医療費',       budget:3500},
+  {name:'代表口座(デビット用)', budget:37500},
+  {name:'財布(現金)',           budget:0},
+  {name:'PayPay',              budget:0},
 ];
 // history: [{id, walletName, memo, amount, year, month, day, ts}]
 let history = LS.get(KEY_HISTORY) || [];
