@@ -1192,10 +1192,11 @@ function switchReportTab(tab){
 // ════════════════════════════════
 function getWeekRange(){
   const today = now();
-  const dow = today.getDay(); // 0=日
-  const mon = new Date(today); mon.setDate(today.getDate() - ((dow+6)%7));
-  const sun = new Date(mon);   sun.setDate(mon.getDate() + 6);
-  return {mon, sun};
+  const dow = today.getDay(); // 0=日, 6=土
+  // 直近の土曜日を起点に（土=0として計算）
+  const sat = new Date(today); sat.setDate(today.getDate() - ((dow+1)%7));
+  const fri = new Date(sat);   fri.setDate(sat.getDate() + 6);
+  return {mon: sat, sun: fri};
 }
 function renderWeeklyStats(){
   const {mon, sun} = getWeekRange();
