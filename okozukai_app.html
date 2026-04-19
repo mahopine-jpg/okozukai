@@ -732,6 +732,7 @@ const cls   = pct => pct>=90?'danger':pct>=70?'warn':'ok';
 const fCls  = pct => pct>=90?'fill-danger':pct>=70?'fill-warn':'fill-ok';
 const now   = () => new Date();
 const ym    = (y,m) => `${y}-${String(m).padStart(2,'0')}`;
+const isTobacco = memo => memo && /タバコ|たばこ|煙草/.test(memo);
 
 function todayStr(){
   const d = now();
@@ -1216,7 +1217,7 @@ function renderWeeklyStats(){
   // 今月のタバコ代
   const tobaccoSpent = history
     .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer'
-              && h.memo && h.memo.includes('タバコ'))
+              && isTobacco(h.memo))
     .reduce((s,h)=>s+h.amount,0);
 
   // 残高
@@ -1272,7 +1273,7 @@ async function runWeeklyCheck(){
   const totalRem    = totalBudget - wallets.reduce((s,w)=>s+spentThisMonth(w.name),0);
   const tobaccoSpent = history
     .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer'
-              && h.memo && h.memo.includes('タバコ'))
+              && isTobacco(h.memo))
     .reduce((s,h)=>s+h.amount,0);
 
   const memoList = weekTx.map(h=>`・${h.memo||'（メモなし）'}：¥${fmt(h.amount)}`).join('\n') || '・記帳なし';
@@ -1330,7 +1331,7 @@ function shareWeeklyMail(){
   const totalRem    = totalBudget - wallets.reduce((s,w)=>s+spentThisMonth(w.name),0);
   const tobaccoSpent = history
     .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer'
-              && h.memo && h.memo.includes('タバコ'))
+              && isTobacco(h.memo))
     .reduce((s,h)=>s+h.amount,0);
   const weekTx = history.filter(h => {
     if(h.rolledOver||h.type==='transfer') return false;
@@ -1557,7 +1558,7 @@ async function runMonthlyReport(){
   }
 
   const spendList = sorted.map(([memo,amt])=>`・${memo}：¥${fmt(amt)}`).join('\n');
-  const tobaccoSpent = sorted.find(([m])=>m.includes('タバコ'))?.[1]||0;
+  const tobaccoSpent = sorted.filter(([m])=>isTobacco(m)).reduce((s,[,v])=>s+v,0);
 
   // 欲しいものリスト
   const boughtThisMonth = wishList.filter(w => w.status==='bought' && w.boughtAt && w.boughtAt.startsWith(ym(reportYear,reportMonth)));
