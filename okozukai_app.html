@@ -583,15 +583,10 @@ body {
           <span class="budget-yen">¥</span>
           <input type="number" class="inp-budget" id="fixed-gas" value="8500" inputmode="numeric" style="flex:1" oninput="markFixedDirty()">
         </div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
           <span style="font-size:14px;font-weight:700;min-width:90px">タバコ代</span>
           <span class="budget-yen">¥</span>
           <input type="number" class="inp-budget" id="fixed-tobacco" value="10000" inputmode="numeric" style="flex:1" oninput="markFixedDirty()">
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <span style="font-size:14px;font-weight:700;min-width:90px">遊興費上限/週</span>
-          <span class="budget-yen">¥</span>
-          <input type="number" class="inp-budget" id="fixed-leisure" value="2000" inputmode="numeric" style="flex:1" oninput="markFixedDirty()">
         </div>
         <div class="api-label" style="margin-top:4px">週次レポートの送り先メールアドレス</div>
         <input type="email" class="inp-api" id="inp-email" placeholder="例：parent@example.com" oninput="markFixedDirty()" style="font-family:var(--sans)">
@@ -704,7 +699,7 @@ const KEY_API      = 'wlt_apikey';
 const KEY_SAVINGS  = 'wlt_savings';
 const KEY_SUMMARY  = 'wlt_summary';
 const KEY_WISHLIST = 'wlt_wishlist';
-const KEY_FIXED    = 'wlt_fixed';    // {gas, tobacco, leisure, email}
+const KEY_FIXED    = 'wlt_fixed';    // {gas, tobacco, email}
 
 // ════════════════════════════════
 //  State
@@ -718,8 +713,7 @@ let history = LS.get(KEY_HISTORY) || [];
 let savings = LS.get(KEY_SAVINGS) || 0;
 let monthlySummaries = LS.get(KEY_SUMMARY) || [];
 let wishList = LS.get(KEY_WISHLIST) || [];
-// fixed: {gas:8500, tobacco:10000, leisure:2000, email:''}
-let fixedCosts = LS.get(KEY_FIXED) || {gas:8500, tobacco:10000, leisure:2000, email:''};
+let fixedCosts = LS.get(KEY_FIXED) || {gas:8500, tobacco:10000, email:''};
 
 // 購入相談の一時保存
 let lastConsultName  = '';
@@ -1080,7 +1074,6 @@ function renderSettings(){
   // 固定費・メール設定
   document.getElementById('fixed-gas').value     = fixedCosts.gas;
   document.getElementById('fixed-tobacco').value = fixedCosts.tobacco;
-  document.getElementById('fixed-leisure').value = fixedCosts.leisure;
   document.getElementById('inp-email').value     = fixedCosts.email||'';
   // APIキー表示
   const stored = LS.get(KEY_API)||'';
@@ -1096,7 +1089,6 @@ function saveFixedSettings(){
   fixedCosts = {
     gas:     parseInt(document.getElementById('fixed-gas').value)||0,
     tobacco: parseInt(document.getElementById('fixed-tobacco').value)||0,
-    leisure: parseInt(document.getElementById('fixed-leisure').value)||0,
     email:   document.getElementById('inp-email').value.trim()
   };
   LS.set(KEY_FIXED, fixedCosts);
@@ -1167,7 +1159,7 @@ function resetEverything(){
   if(!confirm('本当に削除してよいですか？この操作は元に戻せません。')) return;
   localStorage.clear();
   history=[]; savings=0; monthlySummaries=[]; wishList=[];
-  fixedCosts = {gas:8500, tobacco:10000, leisure:2000, email:''};
+  fixedCosts = {gas:8500, tobacco:10000, email:''};
   wallets = [
     {name:'代表口座(デビット用)', budget:37500},
     {name:'財布(現金)',           budget:0},
@@ -1315,6 +1307,9 @@ async function runWeeklyCheck(){
     ? '\n\n【検討中の欲しいもの】\n' + wishItems.map(w=>`・${w.name}：¥${fmt(w.price)}（${w.plan||'計画未記録'}）`).join('\n')
     : '';
 
+  const freeTotal   = Math.max(0, totalBudget - fixedCosts.gas - fixedCosts.tobacco);
+  const freeSpentSoFar = Math.max(0, wallets.reduce((s,w)=>s+spentThisMonth(w.name),0) - fixedCosts.gas - tobaccoSpent);
+
   const prompt = `あなたは親しみやすい家計アドバイザーです。成人した子供のおこづかい管理を親子で確認しています。
 
 【今週の支出明細】
@@ -1324,12 +1319,17 @@ ${memoList}
 【今月の状況】
 残高：¥${fmt(totalRem)}（残り${remainDays}日）
 ${tobaccoStatus}
-固定費（ガソリン¥${fmt(fixedCosts.gas)}・タバコ¥${fmt(fixedCosts.tobacco)}）を除いた自由費の予算：¥${fmt(Math.max(0,totalBudget-fixedCosts.gas-fixedCosts.tobacco))}${wishText}
+自由費（固定費ガソリン¥${fmt(fixedCosts.gas)}・タバコ¥${fmt(fixedCosts.tobacco)}を除いた予算）：¥${fmt(freeTotal)}
+自由費の使用済み：¥${fmt(freeSpentSoFar)}　残り：¥${fmt(Math.max(0,freeTotal-freeSpentSoFar))}${wishText}
+
+【アドバイスの観点】
+・遊興費は固定費ではなく「自分で調整できる費用」です。月の中で上手に配分できているかを見てあげてください。
+・「今週使いすぎたから来週は抑えよう」という自己調整ができているかを褒めたり、気づかせたりしてください。
 
 以下の順でコメントしてください。
-1. 今週の振り返り（よかった点・気になる点）
+1. 今週の振り返り（自由費の使い方・配分のバランスについて）
 2. タバコ代について（減っていたら思いっきり褒める。多ければ優しく指摘）
-3. 来週気をつけること
+3. 来週の自由費をどう使うかのアドバイス
 4. 応援メッセージ
 
 文体はやわらかく親しみやすく。400文字以内。`;
@@ -1560,8 +1560,13 @@ async function runMonthlyReport(){
 
   // メモをキーに集計
   const memoMap = {};
+  const normalizeKey = memo => {
+    if(!memo) return '（メモなし）';
+    if(isTobacco(memo)) return 'タバコ';
+    return memo;
+  };
   monthHistory.forEach(h => {
-    const key = h.memo || '（メモなし）';
+    const key = normalizeKey(h.memo);
     memoMap[key] = (memoMap[key]||0) + h.amount;
   });
   const total = Object.values(memoMap).reduce((s,v)=>s+v,0);
@@ -1594,19 +1599,27 @@ async function runMonthlyReport(){
     ? '\n\n【今月購入したもの】\n' + boughtThisMonth.map(w=>`・${w.name}（¥${fmt(w.price)}）`).join('\n')
     : '';
 
-  const prompt = `あなたは親しみやすい家計アドバイザーです。
+  const monthlyBudget  = wallets.reduce((s,w)=>s+w.budget,0);
+  const freeTotal      = Math.max(0, monthlyBudget - fixedCosts.gas - fixedCosts.tobacco);
+  const freeSpent      = Math.max(0, total - fixedCosts.gas - tobaccoSpent);
+
+  const prompt = `あなたは親しみやすい家計アドバイザーです。成人した子供のおこづかい管理を親子で振り返っています。
 
 【${reportYear}年${reportMonth}月の支出内訳（メモ別）】
 ${spendList}
-合計：¥${fmt(total)}
-予算：¥${fmt(wallets.reduce((s,w)=>s+w.budget,0))}
-タバコ代：¥${fmt(tobaccoSpent)}（月の目標¥${fmt(fixedCosts.tobacco)}）${wishSection}
+合計：¥${fmt(total)}　予算：¥${fmt(monthlyBudget)}
+タバコ代：¥${fmt(tobaccoSpent)}（月の目標¥${fmt(fixedCosts.tobacco)}）
+自由費（固定費ガソリン・タバコを除く）：予算¥${fmt(freeTotal)}　実績¥${fmt(freeSpent)}${wishSection}
+
+【アドバイスの観点】
+・遊興費・外食・趣味などは「自分で調整できる費用」です。固定費を払ったうえで残った自由費をどう配分したかを評価してください。
+・「月の前半に使いすぎず後半まで持たせる」「使いたいものに優先順位をつける」といった自己管理の練習として捉えてコメントしてください。
 
 以下の順でコメントしてください。
-1. 全体の評価（一言）
+1. 全体の評価（自由費の使い方・配分の観点で）
 2. 無駄遣いと思われる項目を具体的に指摘（あれば）
 3. タバコ代の評価（目標より少なければ思いっきり褒める）
-4. 来月への改善アドバイス
+4. 来月の自由費をもっと上手に使うためのアドバイス
 5. 応援の一言
 
 文体はやわらかく親しみやすく。450文字以内。`;
