@@ -477,9 +477,14 @@ body {
 
     <!-- ① 週次チェック -->
     <div id="rsec-weekly">
+      <div class="month-selector" style="margin-bottom:8px">
+        <button class="month-btn" onclick="changeWeek(-1)">‹</button>
+        <div class="month-display" id="weekly-range-label"></div>
+        <button class="month-btn" onclick="changeWeek(1)">›</button>
+      </div>
       <div class="report-card" style="margin-bottom:8px">
         <div class="report-section">
-          <div class="report-sec-label">今週の状況</div>
+          <div class="report-sec-label">この週の状況</div>
           <div id="weekly-stats"></div>
         </div>
       </div>
@@ -1182,7 +1187,7 @@ function switchReportTab(tab){
     document.getElementById('rsec-'+t).style.display = t===tab ? 'block' : 'none';
     document.getElementById('rtab-'+t).classList.toggle('active', t===tab);
   });
-  if(tab==='weekly')  renderWeeklyStats();
+  if(tab==='weekly')  { updateWeekLabel(); renderWeeklyStats(); }
   if(tab==='wish')    renderWishList();
   if(tab==='monthly'){ updateReportMonthLabel(); renderSummaryList(); }
 }
@@ -1190,13 +1195,35 @@ function switchReportTab(tab){
 // ════════════════════════════════
 //  週次チェック
 // ════════════════════════════════
-function getWeekRange(){
+let weekOffset = 0; // 0=今週, -1=先週, ...
+
+function getWeekRange(offset){
+  offset = offset !== undefined ? offset : weekOffset;
   const today = now();
   const dow = today.getDay(); // 0=日, 6=土
-  // 直近の土曜日を起点に（土=0として計算）
-  const sat = new Date(today); sat.setDate(today.getDate() - ((dow+1)%7));
-  const fri = new Date(sat);   fri.setDate(sat.getDate() + 6);
+  const sat = new Date(today);
+  sat.setDate(today.getDate() - ((dow+1)%7) + offset*7);
+  sat.setHours(0,0,0,0);
+  const fri = new Date(sat); fri.setDate(sat.getDate() + 6);
+  fri.setHours(23,59,59,999);
   return {mon: sat, sun: fri};
+}
+
+function updateWeekLabel(){
+  const {mon, sun} = getWeekRange();
+  const fmt2 = d => `${d.getMonth()+1}/${d.getDate()}`;
+  const label = weekOffset === 0 ? `今週（${fmt2(mon)}〜${fmt2(sun)}）`
+              : weekOffset === -1 ? `先週（${fmt2(mon)}〜${fmt2(sun)}）`
+              : `${fmt2(mon)}〜${fmt2(sun)}`;
+  document.getElementById('weekly-range-label').textContent = label;
+}
+
+function changeWeek(delta){
+  weekOffset += delta;
+  if(weekOffset > 0) weekOffset = 0; // 未来には進めない
+  updateWeekLabel();
+  document.getElementById('weekly-ai-wrap').style.display = 'none';
+  renderWeeklyStats();
 }
 function renderWeeklyStats(){
   const {mon, sun} = getWeekRange();
@@ -1957,6 +1984,7 @@ renderSelect();
 renderHistory();
 updateReportMonthLabel();
 renderSummaryList();
+updateWeekLabel();
 renderWeeklyStats();
 </script>
 </body>
