@@ -387,6 +387,48 @@ body {
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+/* ── Report tabs ── */
+.report-tab-row {
+  display: flex; background: var(--bg2); border-radius: 10px; padding: 3px;
+  margin-bottom: 12px; gap: 2px;
+}
+.report-tab {
+  flex: 1; text-align: center; padding: 9px 4px;
+  font-size: 12px; font-weight: 700; color: var(--muted);
+  border-radius: 8px; cursor: pointer; transition: all .15s; user-select: none;
+}
+.report-tab.active {
+  background: var(--surface); color: var(--text); border: 1.5px solid var(--border);
+}
+/* ── Wish list ── */
+.wish-item {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 12px; padding: 14px 16px; margin-bottom: 8px;
+}
+.wish-item-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+.wish-name { font-size: 16px; font-weight: 700; }
+.wish-price { font-size: 18px; font-weight: 900; }
+.wish-meta { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 8px; line-height: 1.7; }
+.wish-status-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.wish-status-btn {
+  border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 700;
+  cursor: pointer; border: 1.5px solid var(--border); background: var(--bg2); color: var(--muted);
+  transition: all .1s; font-family: var(--sans);
+}
+.wish-status-btn.active-considering { background: #e8f0fe; color: #1a4a8a; border-color: #b5d0f5; }
+.wish-status-btn.active-bought { background: var(--ok-bg); color: var(--ok); border-color: var(--ok); }
+.wish-status-btn.active-gave-up { background: var(--bg2); color: var(--muted); border-color: var(--border2); text-decoration: line-through; }
+.wish-del-btn {
+  margin-left: auto; background: none; border: none; color: var(--border2);
+  font-size: 16px; cursor: pointer; padding: 2px 4px;
+}
+.wish-del-btn:active { color: var(--danger); }
+/* ── Spend analysis ── */
+.spend-bar-row { margin-bottom: 10px; }
+.spend-bar-label { display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+.spend-bar-track { height: 8px; background: var(--bg2); border-radius: 4px; overflow: hidden; }
+.spend-bar-fill { height: 100%; background: var(--text); border-radius: 4px; }
+
 @keyframes fadeUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
@@ -424,29 +466,91 @@ body {
 <!-- ════ REPORT ════ -->
 <div class="page" id="page-report">
   <div class="report-wrap">
-    <div class="month-selector">
-      <button class="month-btn" onclick="changeReportMonth(-1)">‹</button>
-      <div class="month-display" id="report-month-label"></div>
-      <button class="month-btn" onclick="changeReportMonth(1)">›</button>
+
+    <!-- タブ -->
+    <div class="report-tab-row">
+      <div class="report-tab active" id="rtab-weekly"  onclick="switchReportTab('weekly')">週次</div>
+      <div class="report-tab"        id="rtab-consult" onclick="switchReportTab('consult')">購入相談</div>
+      <div class="report-tab"        id="rtab-wish"    onclick="switchReportTab('wish')">欲しいもの</div>
+      <div class="report-tab"        id="rtab-monthly" onclick="switchReportTab('monthly')">月次</div>
     </div>
-    <button class="report-btn" id="report-btn" onclick="runReport()">集計してAI評価を出す</button>
-    <div id="report-output" style="display:none">
-      <div class="report-card">
+
+    <!-- ① 週次チェック -->
+    <div id="rsec-weekly">
+      <div class="report-card" style="margin-bottom:8px">
         <div class="report-section">
-          <div class="report-sec-label">口座別 使用状況</div>
-          <div id="report-rows"></div>
-        </div>
-        <div class="report-section">
-          <div class="report-sec-label">AI 評価・アドバイス</div>
-          <div id="ai-output"></div>
+          <div class="report-sec-label">今週の状況</div>
+          <div id="weekly-stats"></div>
         </div>
       </div>
-      <button class="export-btn" id="rollover-btn" onclick="doRollover()" style="display:none;background:var(--text);color:#fff;border-color:var(--text);margin-bottom:8px">🏦 月次繰越する（貯金口座に積み立て）</button>
-      <button class="export-btn" onclick="exportCSV()">📥 Excelに出力（CSV）</button>
-      <button class="export-btn" onclick="exportSummaryCSV()" style="margin-top:8px">📊 月次サマリCSVを出力（全月分）</button>
+      <button class="report-btn" onclick="runWeeklyCheck()">AIに週次チェックしてもらう</button>
+      <div id="weekly-ai-wrap" style="display:none">
+        <div class="report-card" style="margin-bottom:8px">
+          <div class="report-section">
+            <div class="report-sec-label">AI コメント</div>
+            <div id="weekly-ai-output"></div>
+          </div>
+        </div>
+        <button class="export-btn" onclick="shareWeeklyMail()">📧 週次レポートをメールで共有</button>
+      </div>
     </div>
-    <div class="sec-label" style="padding-left:0;margin-top:16px">月次サマリ履歴</div>
-    <div id="summary-list"></div>
+
+    <!-- ② 購入相談 -->
+    <div id="rsec-consult" style="display:none">
+      <div class="report-card" style="margin-bottom:8px">
+        <div class="report-section">
+          <div class="report-sec-label">欲しいものを相談する</div>
+          <input type="text" class="inp-memo" id="consult-name" placeholder="欲しいもの（例：AirPods）" style="margin-top:4px">
+          <div class="field-row" style="align-items:center;margin-bottom:0">
+            <span class="yen" style="flex-shrink:0">¥</span>
+            <input type="number" class="inp-amount" id="consult-price" placeholder="0" inputmode="numeric" style="flex:1;min-width:0;font-size:22px">
+          </div>
+        </div>
+      </div>
+      <button class="report-btn" id="consult-btn" onclick="runConsult()">AIに相談する</button>
+      <div id="consult-ai-wrap" style="display:none">
+        <div class="report-card" style="margin-bottom:8px">
+          <div class="report-section">
+            <div class="report-sec-label">AI アドバイス</div>
+            <div id="consult-ai-output"></div>
+          </div>
+        </div>
+        <button class="export-btn" id="add-wish-btn" onclick="addToWishList()" style="background:var(--text);color:#fff;border-color:var(--text)">⭐ 欲しいものリストに追加</button>
+      </div>
+    </div>
+
+    <!-- ③ 欲しいものリスト -->
+    <div id="rsec-wish" style="display:none">
+      <div id="wish-list-container"></div>
+    </div>
+
+    <!-- ④ 月次使途分析 -->
+    <div id="rsec-monthly" style="display:none">
+      <div class="month-selector">
+        <button class="month-btn" onclick="changeReportMonth(-1)">‹</button>
+        <div class="month-display" id="report-month-label"></div>
+        <button class="month-btn" onclick="changeReportMonth(1)">›</button>
+      </div>
+      <button class="report-btn" id="report-btn" onclick="runMonthlyReport()">月次分析・AI評価を出す</button>
+      <div id="report-output" style="display:none">
+        <div class="report-card" style="margin-bottom:8px">
+          <div class="report-section">
+            <div class="report-sec-label">支出内訳（メモ別）</div>
+            <div id="spend-breakdown"></div>
+          </div>
+          <div class="report-section">
+            <div class="report-sec-label">AI 評価・アドバイス</div>
+            <div id="ai-output"></div>
+          </div>
+        </div>
+        <button class="export-btn" id="rollover-btn" onclick="doRollover()" style="display:none;background:var(--text);color:#fff;border-color:var(--text);margin-bottom:8px">🏦 月次繰越する（貯金口座に積み立て）</button>
+        <button class="export-btn" onclick="exportCSV()">📥 Excelに出力（CSV）</button>
+        <button class="export-btn" onclick="exportSummaryCSV()" style="margin-top:8px">📊 月次サマリCSVを出力（全月分）</button>
+      </div>
+      <div class="sec-label" style="padding-left:0;margin-top:16px">月次サマリ履歴</div>
+      <div id="summary-list"></div>
+    </div>
+
   </div>
 </div>
 
@@ -464,6 +568,31 @@ body {
     </div>
     <button class="add-wallet-btn" onclick="addWallet()">＋ 口座を追加</button>
     <button class="save-btn" id="save-wallets-btn" onclick="saveWallets()" disabled>口座設定を保存</button>
+
+    <div class="sec-label" style="margin-top:12px">固定費・連絡先設定</div>
+    <div class="setting-card">
+      <div class="api-row">
+        <div class="api-label">毎月かかる固定費（AI分析に使用）</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="font-size:14px;font-weight:700;min-width:90px">ガソリン代</span>
+          <span class="budget-yen">¥</span>
+          <input type="number" class="inp-budget" id="fixed-gas" value="8500" inputmode="numeric" style="flex:1" oninput="markFixedDirty()">
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="font-size:14px;font-weight:700;min-width:90px">タバコ代</span>
+          <span class="budget-yen">¥</span>
+          <input type="number" class="inp-budget" id="fixed-tobacco" value="10000" inputmode="numeric" style="flex:1" oninput="markFixedDirty()">
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="font-size:14px;font-weight:700;min-width:90px">遊興費上限/週</span>
+          <span class="budget-yen">¥</span>
+          <input type="number" class="inp-budget" id="fixed-leisure" value="2000" inputmode="numeric" style="flex:1" oninput="markFixedDirty()">
+        </div>
+        <div class="api-label" style="margin-top:4px">週次レポートの送り先メールアドレス</div>
+        <input type="email" class="inp-api" id="inp-email" placeholder="例：parent@example.com" oninput="markFixedDirty()" style="font-family:var(--sans)">
+        <button class="save-btn" id="save-fixed-btn" style="margin-top:4px" onclick="saveFixedSettings()" disabled>固定費・連絡先を保存</button>
+      </div>
+    </div>
 
     <div class="sec-label" style="margin-top:12px">Claude API キー</div>
     <div class="setting-card">
@@ -567,8 +696,10 @@ const LS = {
 const KEY_WALLETS  = 'wlt_wallets';
 const KEY_HISTORY  = 'wlt_history';
 const KEY_API      = 'wlt_apikey';
-const KEY_SAVINGS  = 'wlt_savings';   // 貯金残高
-const KEY_SUMMARY  = 'wlt_summary';   // 月次サマリ履歴
+const KEY_SAVINGS  = 'wlt_savings';
+const KEY_SUMMARY  = 'wlt_summary';
+const KEY_WISHLIST = 'wlt_wishlist';
+const KEY_FIXED    = 'wlt_fixed';    // {gas, tobacco, leisure, email}
 
 // ════════════════════════════════
 //  State
@@ -578,12 +709,17 @@ let wallets = LS.get(KEY_WALLETS) || [
   {name:'財布(現金)',           budget:0},
   {name:'PayPay',              budget:0},
 ];
-// history: [{id, walletName, memo, amount, year, month, day, ts}]
 let history = LS.get(KEY_HISTORY) || [];
-// savings: 貯金口座の残高
 let savings = LS.get(KEY_SAVINGS) || 0;
-// monthlySummaries: [{year, month, wallets:[{name,budget,spent}], totalRem, aiComment, ts}]
 let monthlySummaries = LS.get(KEY_SUMMARY) || [];
+let wishList = LS.get(KEY_WISHLIST) || [];
+// fixed: {gas:8500, tobacco:10000, leisure:2000, email:''}
+let fixedCosts = LS.get(KEY_FIXED) || {gas:8500, tobacco:10000, leisure:2000, email:''};
+
+// 購入相談の一時保存
+let lastConsultName  = '';
+let lastConsultPrice = 0;
+let lastConsultPlan  = '';
 
 let reportYear  = new Date().getFullYear();
 let reportMonth = new Date().getMonth() + 1;
@@ -935,9 +1071,32 @@ function renderSettings(){
       <button class="del-btn" onclick="delWalletRow(${i})">×</button>`;
     c.appendChild(row);
   });
+  // 固定費・メール設定
+  document.getElementById('fixed-gas').value     = fixedCosts.gas;
+  document.getElementById('fixed-tobacco').value = fixedCosts.tobacco;
+  document.getElementById('fixed-leisure').value = fixedCosts.leisure;
+  document.getElementById('inp-email').value     = fixedCosts.email||'';
   // APIキー表示
   const stored = LS.get(KEY_API)||'';
   document.getElementById('inp-api').value = stored ? '●'.repeat(20) : '';
+}
+
+let fixedDirty = false;
+function markFixedDirty(){
+  fixedDirty = true;
+  document.getElementById('save-fixed-btn').disabled = false;
+}
+function saveFixedSettings(){
+  fixedCosts = {
+    gas:     parseInt(document.getElementById('fixed-gas').value)||0,
+    tobacco: parseInt(document.getElementById('fixed-tobacco').value)||0,
+    leisure: parseInt(document.getElementById('fixed-leisure').value)||0,
+    email:   document.getElementById('inp-email').value.trim()
+  };
+  LS.set(KEY_FIXED, fixedCosts);
+  fixedDirty = false;
+  document.getElementById('save-fixed-btn').disabled = true;
+  showToast('✓ 固定費・連絡先を保存しました');
 }
 
 function addWallet(){
@@ -998,10 +1157,11 @@ function resetAllData(){
 }
 
 function resetEverything(){
-  if(!confirm('すべてのデータ（記帳履歴・貯金・月次サマリ・口座設定・APIキー）を完全に削除します。\nデフォルトの状態に戻ります。\nよろしいですか？')) return;
+  if(!confirm('すべてのデータ（記帳履歴・貯金・月次サマリ・欲しいものリスト・口座設定・固定費・APIキー）を完全に削除します。\nデフォルトの状態に戻ります。\nよろしいですか？')) return;
   if(!confirm('本当に削除してよいですか？この操作は元に戻せません。')) return;
   localStorage.clear();
-  history=[]; savings=0; monthlySummaries=[];
+  history=[]; savings=0; monthlySummaries=[]; wishList=[];
+  fixedCosts = {gas:8500, tobacco:10000, leisure:2000, email:''};
   wallets = [
     {name:'代表口座(デビット用)', budget:37500},
     {name:'財布(現金)',           budget:0},
@@ -1012,11 +1172,337 @@ function resetEverything(){
 }
 
 // ════════════════════════════════
-//  Report
+//  Report tab switch
+// ════════════════════════════════
+let currentReportTab = 'weekly';
+function switchReportTab(tab){
+  currentReportTab = tab;
+  ['weekly','consult','wish','monthly'].forEach(t => {
+    document.getElementById('rsec-'+t).style.display = t===tab ? 'block' : 'none';
+    document.getElementById('rtab-'+t).classList.toggle('active', t===tab);
+  });
+  if(tab==='weekly')  renderWeeklyStats();
+  if(tab==='wish')    renderWishList();
+  if(tab==='monthly'){ updateReportMonthLabel(); renderSummaryList(); }
+}
+
+// ════════════════════════════════
+//  週次チェック
+// ════════════════════════════════
+function getWeekRange(){
+  const today = now();
+  const dow = today.getDay(); // 0=日
+  const mon = new Date(today); mon.setDate(today.getDate() - ((dow+6)%7));
+  const sun = new Date(mon);   sun.setDate(mon.getDate() + 6);
+  return {mon, sun};
+}
+function renderWeeklyStats(){
+  const {mon, sun} = getWeekRange();
+  const cym = currentYM();
+  // 今週の支出（移動のoutは除外、支出のみ）
+  const weekTx = history.filter(h => {
+    if(h.rolledOver) return false;
+    if(h.type==='transfer') return false;
+    const d = new Date(h.year, h.month-1, h.day);
+    return d >= mon && d <= sun;
+  });
+  const weekSpent = weekTx.reduce((s,h)=>s+h.amount, 0);
+
+  // 今月の支出合計
+  const monthSpent = history
+    .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer')
+    .reduce((s,h)=>s+h.amount,0);
+
+  // 今月のタバコ代
+  const tobaccoSpent = history
+    .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer'
+              && h.memo && h.memo.includes('タバコ'))
+    .reduce((s,h)=>s+h.amount,0);
+
+  // 残高
+  const totalBudget = wallets.reduce((s,w)=>s+w.budget,0);
+  const totalRem = totalBudget - wallets.reduce((s,w)=>s+spentThisMonth(w.name),0);
+
+  // 固定費残り（今月）
+  const gasSpent = history
+    .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer'
+              && h.memo && (h.memo.includes('ガソリン')||h.memo.includes('給油')))
+    .reduce((s,h)=>s+h.amount,0);
+  const gasRem = Math.max(0, fixedCosts.gas - gasSpent);
+
+  // 自由費（予算 - 固定費合計）
+  const d = now();
+  const daysInMonth = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  const remainDays  = daysInMonth - d.getDate();
+  const fixedTotal  = fixedCosts.gas + fixedCosts.tobacco;
+  const freeRem     = totalRem - gasRem; // ガソリン残を引いた自由費残
+
+  const c = document.getElementById('weekly-stats');
+  c.innerHTML = `
+    <div class="report-row"><div class="report-row-name">今週の支出</div><div class="report-row-right"><span class="report-row-val">¥${fmt(weekSpent)}</span></div></div>
+    <div class="report-row"><div class="report-row-name">今月の残高</div><div class="report-row-right"><span class="report-row-val">¥${fmt(totalRem)}</span><span class="report-row-sub">残${remainDays}日</span></div></div>
+    <div class="report-row"><div class="report-row-name">タバコ代（今月）</div><div class="report-row-right"><span class="report-row-val">¥${fmt(tobaccoSpent)}</span><span class="report-row-sub">/ ¥${fmt(fixedCosts.tobacco)}</span></div></div>
+    <div class="report-row" style="border-bottom:none"><div class="report-row-name">自由費残り</div><div class="report-row-right"><span class="report-row-val">¥${fmt(freeRem)}</span></div></div>`;
+}
+
+async function runWeeklyCheck(){
+  const apiKey = LS.get(KEY_API);
+  const wrap = document.getElementById('weekly-ai-wrap');
+  const aiBox = document.getElementById('weekly-ai-output');
+  wrap.style.display = 'block';
+  if(!apiKey){
+    aiBox.innerHTML = `<div class="ai-box" style="color:var(--muted)">設定画面でAPIキーを入力するとAIコメントが表示されます。</div>`;
+    return;
+  }
+  aiBox.innerHTML = '<div class="ai-loading"><div class="spinner"></div>AIが分析中...</div>';
+
+  const {mon, sun} = getWeekRange();
+  const cym = currentYM();
+  const d = now();
+  const daysInMonth = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  const remainDays  = daysInMonth - d.getDate();
+
+  const weekTx = history.filter(h => {
+    if(h.rolledOver||h.type==='transfer') return false;
+    const dt = new Date(h.year, h.month-1, h.day);
+    return dt >= mon && dt <= sun;
+  });
+  const weekSpent   = weekTx.reduce((s,h)=>s+h.amount,0);
+  const totalBudget = wallets.reduce((s,w)=>s+w.budget,0);
+  const totalRem    = totalBudget - wallets.reduce((s,w)=>s+spentThisMonth(w.name),0);
+  const tobaccoSpent = history
+    .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer'
+              && h.memo && h.memo.includes('タバコ'))
+    .reduce((s,h)=>s+h.amount,0);
+
+  const memoList = weekTx.map(h=>`・${h.memo||'（メモなし）'}：¥${fmt(h.amount)}`).join('\n') || '・記帳なし';
+  const tobaccoStatus = tobaccoSpent <= fixedCosts.tobacco
+    ? `今月のタバコ代は¥${fmt(tobaccoSpent)}（上限¥${fmt(fixedCosts.tobacco)}）で、まだ抑えられています。`
+    : `今月のタバコ代は¥${fmt(tobaccoSpent)}で、上限¥${fmt(fixedCosts.tobacco)}を超えています。`;
+
+  // 欲しいものリスト（検討中）
+  const wishItems = wishList.filter(w=>w.status==='considering');
+  const wishText  = wishItems.length
+    ? '\n\n【検討中の欲しいもの】\n' + wishItems.map(w=>`・${w.name}：¥${fmt(w.price)}（${w.plan||'計画未記録'}）`).join('\n')
+    : '';
+
+  const prompt = `あなたは親しみやすい家計アドバイザーです。成人した子供のおこづかい管理を親子で確認しています。
+
+【今週の支出明細】
+${memoList}
+今週の合計：¥${fmt(weekSpent)}
+
+【今月の状況】
+残高：¥${fmt(totalRem)}（残り${remainDays}日）
+${tobaccoStatus}
+固定費（ガソリン¥${fmt(fixedCosts.gas)}・タバコ¥${fmt(fixedCosts.tobacco)}）を除いた自由費の予算：¥${fmt(Math.max(0,totalBudget-fixedCosts.gas-fixedCosts.tobacco))}${wishText}
+
+以下の順でコメントしてください。
+1. 今週の振り返り（よかった点・気になる点）
+2. タバコ代について（減っていたら思いっきり褒める。多ければ優しく指摘）
+3. 来週気をつけること
+4. 応援メッセージ
+
+文体はやわらかく親しみやすく。400文字以内。`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body: JSON.stringify({model:'claude-sonnet-4-6',max_tokens:800,messages:[{role:'user',content:prompt}]})
+    });
+    const data = await res.json();
+    if(data.error) throw new Error(data.error.message);
+    const text = data.content?.find(b=>b.type==='text')?.text||'';
+    aiBox.innerHTML = `<div class="ai-box">${text.replace(/\n/g,'<br>')}</div>`;
+  } catch(e){
+    aiBox.innerHTML = `<div class="ai-box" style="color:var(--danger)">エラー: ${e.message}</div>`;
+  }
+}
+
+function shareWeeklyMail(){
+  const aiText = document.getElementById('weekly-ai-output').querySelector('.ai-box')?.innerText||'';
+  const {mon, sun} = getWeekRange();
+  const fmt2 = d => `${d.getMonth()+1}/${d.getDate()}`;
+  const d = now();
+  const cym = currentYM();
+  const totalBudget = wallets.reduce((s,w)=>s+w.budget,0);
+  const totalRem    = totalBudget - wallets.reduce((s,w)=>s+spentThisMonth(w.name),0);
+  const tobaccoSpent = history
+    .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer'
+              && h.memo && h.memo.includes('タバコ'))
+    .reduce((s,h)=>s+h.amount,0);
+  const weekTx = history.filter(h => {
+    if(h.rolledOver||h.type==='transfer') return false;
+    const dt = new Date(h.year, h.month-1, h.day);
+    return dt >= mon && dt <= sun;
+  });
+  const weekSpent = weekTx.reduce((s,h)=>s+h.amount,0);
+
+  const wishItems = wishList.filter(w=>w.status==='considering');
+  const wishSection = wishItems.length
+    ? '\n\n■ 検討中の欲しいもの\n' + wishItems.map(w=>`・${w.name}（¥${fmt(w.price)}）${w.plan||''}`).join('\n')
+    : '';
+
+  const subject = encodeURIComponent(`おこづかい週次レポート（${fmt2(mon)}〜${fmt2(sun)}）`);
+  const body = encodeURIComponent(
+`おこづかい週次レポート ${fmt2(mon)}〜${fmt2(sun)}
+
+■ 今週の支出：¥${fmt(weekSpent)}
+■ 今月の残高：¥${fmt(totalRem)}
+■ タバコ代（今月）：¥${fmt(tobaccoSpent)} / ¥${fmt(fixedCosts.tobacco)}${wishSection}
+
+■ AIコメント
+${aiText}
+`);
+  const to = encodeURIComponent(fixedCosts.email||'');
+  window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
+}
+
+// ════════════════════════════════
+//  購入相談
+// ════════════════════════════════
+async function runConsult(){
+  const name  = document.getElementById('consult-name').value.trim();
+  const price = parseInt(document.getElementById('consult-price').value)||0;
+  if(!name||price<=0){ showToast('名前と金額を入力してください'); return; }
+  const apiKey = LS.get(KEY_API);
+  const wrap   = document.getElementById('consult-ai-wrap');
+  const aiBox  = document.getElementById('consult-ai-output');
+  const btn    = document.getElementById('consult-btn');
+  btn.disabled = true;
+  wrap.style.display = 'block';
+  document.getElementById('add-wish-btn').style.display = 'none';
+  if(!apiKey){
+    aiBox.innerHTML = `<div class="ai-box" style="color:var(--muted)">APIキーを設定するとAIアドバイスが使えます。</div>`;
+    btn.disabled=false; return;
+  }
+  aiBox.innerHTML = '<div class="ai-loading"><div class="spinner"></div>AIが相談中...</div>';
+
+  const cym = currentYM();
+  const totalBudget = wallets.reduce((s,w)=>s+w.budget,0);
+  const totalRem    = totalBudget - wallets.reduce((s,w)=>s+spentThisMonth(w.name),0);
+  const d = now();
+  const daysInMonth = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  const remainDays  = daysInMonth - d.getDate();
+  const fixedRem    = fixedCosts.gas + fixedCosts.tobacco;
+  const freeRem     = Math.max(0, totalRem - fixedRem);
+  const monthlyFree = Math.max(0, totalBudget - fixedCosts.gas - fixedCosts.tobacco);
+
+  const prompt = `あなたは親しみやすい家計アドバイザーです。
+
+【相談内容】
+欲しいもの：${name}
+価格：¥${fmt(price)}
+
+【現在の財務状況】
+今月の残高：¥${fmt(totalRem)}（残り${remainDays}日）
+固定費（ガソリン・タバコ）を除いた今月の自由費残り：¥${fmt(freeRem)}
+毎月の自由費（固定費除き）：¥${fmt(monthlyFree)}
+貯金口座の残高：¥${fmt(savings)}
+
+以下の順でアドバイスしてください。
+1. 今月すぐ買えるか（残高・固定費をふまえて判断）
+2. 買えない場合：何をいくら節約すれば何ヶ月で買えるか（具体的な数字で）
+3. 貯金から出す場合の影響（貯金残高をふまえて）
+4. 背中を押す一言またはちょっと待ってのアドバイス
+
+文体はやわらかく親しみやすく。400文字以内。`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body: JSON.stringify({model:'claude-sonnet-4-6',max_tokens:800,messages:[{role:'user',content:prompt}]})
+    });
+    const data = await res.json();
+    if(data.error) throw new Error(data.error.message);
+    const text = data.content?.find(b=>b.type==='text')?.text||'';
+    aiBox.innerHTML = `<div class="ai-box">${text.replace(/\n/g,'<br>')}</div>`;
+    lastConsultName  = name;
+    lastConsultPrice = price;
+    lastConsultPlan  = text;
+    document.getElementById('add-wish-btn').style.display = 'block';
+  } catch(e){
+    aiBox.innerHTML = `<div class="ai-box" style="color:var(--danger)">エラー: ${e.message}</div>`;
+  }
+  btn.disabled = false;
+}
+
+// ════════════════════════════════
+//  欲しいものリスト
+// ════════════════════════════════
+function addToWishList(){
+  if(!lastConsultName||!lastConsultPrice) return;
+  const item = {
+    id: Date.now().toString(36),
+    name: lastConsultName,
+    price: lastConsultPrice,
+    plan: lastConsultPlan,
+    status: 'considering', // considering / bought / gave-up
+    addedAt: now().toISOString(),
+    boughtAt: null
+  };
+  wishList.push(item);
+  LS.set(KEY_WISHLIST, wishList);
+  showToast(`「${lastConsultName}」をリストに追加しました`);
+  document.getElementById('add-wish-btn').style.display = 'none';
+}
+
+function renderWishList(){
+  const c = document.getElementById('wish-list-container');
+  c.innerHTML = '';
+  if(!wishList.length){
+    c.innerHTML = '<div class="empty-msg">欲しいものはまだありません<br>購入相談からリストに追加できます</div>';
+    return;
+  }
+  const sorted = [...wishList].sort((a,b)=>{
+    const order = {considering:0, bought:1, 'gave-up':2};
+    return (order[a.status]||0) - (order[b.status]||0);
+  });
+  sorted.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'wish-item';
+    const statusMap = {considering:'検討中', bought:'買った', 'gave-up':'諦めた'};
+    const boughtInfo = item.boughtAt ? `　購入日：${item.boughtAt.slice(0,10)}` : '';
+    el.innerHTML = `
+      <div class="wish-item-top">
+        <div class="wish-name">${item.name}</div>
+        <div class="wish-price">¥${fmt(item.price)}</div>
+      </div>
+      <div class="wish-meta">追加日：${item.addedAt.slice(0,10)}${boughtInfo}</div>
+      <div class="wish-status-row">
+        <button class="wish-status-btn ${item.status==='considering'?'active-considering':''}" onclick="setWishStatus('${item.id}','considering')">検討中</button>
+        <button class="wish-status-btn ${item.status==='bought'?'active-bought':''}" onclick="setWishStatus('${item.id}','bought')">買った</button>
+        <button class="wish-status-btn ${item.status==='gave-up'?'active-gave-up':''}" onclick="setWishStatus('${item.id}','gave-up')">諦めた</button>
+        <button class="wish-del-btn" onclick="deleteWish('${item.id}')">×</button>
+      </div>`;
+    c.appendChild(el);
+  });
+}
+
+function setWishStatus(id, status){
+  const idx = wishList.findIndex(w=>w.id===id);
+  if(idx<0) return;
+  wishList[idx].status = status;
+  if(status==='bought' && !wishList[idx].boughtAt){
+    wishList[idx].boughtAt = now().toISOString().slice(0,10);
+  }
+  LS.set(KEY_WISHLIST, wishList);
+  renderWishList();
+}
+function deleteWish(id){
+  if(!confirm('この項目を削除しますか？')) return;
+  wishList = wishList.filter(w=>w.id!==id);
+  LS.set(KEY_WISHLIST, wishList);
+  renderWishList();
+}
+
+// ════════════════════════════════
+//  月次使途分析
 // ════════════════════════════════
 function updateReportMonthLabel(){
-  document.getElementById('report-month-label').textContent =
-    `${reportYear}年${reportMonth}月`;
+  document.getElementById('report-month-label').textContent = `${reportYear}年${reportMonth}月`;
 }
 function changeReportMonth(delta){
   reportMonth += delta;
@@ -1027,107 +1513,92 @@ function changeReportMonth(delta){
   document.getElementById('report-btn').disabled=false;
 }
 
-async function runReport(){
+async function runMonthlyReport(){
   const btn = document.getElementById('report-btn');
   btn.disabled = true;
-
-  // 対象月の記帳があるか確認
   const target = ym(reportYear, reportMonth);
-  const monthHistory = history.filter(h => ym(h.year,h.month)===target);
+  const monthHistory = history.filter(h => ym(h.year,h.month)===target && h.type!=='transfer');
+  document.getElementById('report-output').style.display = 'block';
 
-  document.getElementById('report-output').style.display='block';
-
-  // 口座別集計
-  const rows = document.getElementById('report-rows');
-  rows.innerHTML = '';
-  let hasData = false;
-
-  wallets.forEach(w => {
-    const spent = spentInMonth(w.name, reportYear, reportMonth);
-    if(spent===0 && monthHistory.length===0) return;
-    hasData = true;
-    const pct = w.budget>0 ? Math.min(100,Math.round(spent/w.budget*100)) : 0;
-    const c   = cls(pct);
-    const badgeCls = c==='ok'?'badge-ok':c==='warn'?'badge-warn':'badge-danger';
-    const label    = pct>=90?'注意':pct>=70?'やや多い':'良好';
-    const row = document.createElement('div');
-    row.className = 'report-row';
-    row.innerHTML = `
-      <div class="report-row-name">${w.name}</div>
-      <div class="report-row-right">
-        <div>
-          <span class="report-row-val">¥${fmt(spent)}</span>
-          <span class="report-row-sub"> / ¥${fmt(w.budget)}</span>
-        </div>
-        <span class="badge ${badgeCls}">${label}</span>
-      </div>`;
-    rows.appendChild(row);
-  });
-
-  if(!hasData){
-    rows.innerHTML = '<div class="empty-msg" style="padding:20px 0">この月の記帳データがありません</div>';
+  // メモ別集計
+  const breakdown = document.getElementById('spend-breakdown');
+  breakdown.innerHTML = '';
+  if(!monthHistory.length){
+    breakdown.innerHTML = '<div class="empty-msg" style="padding:20px 0">この月の記帳データがありません</div>';
     document.getElementById('ai-output').innerHTML = '';
-    btn.disabled=false;
-    return;
+    btn.disabled = false; return;
   }
+
+  // メモをキーに集計
+  const memoMap = {};
+  monthHistory.forEach(h => {
+    const key = h.memo || '（メモなし）';
+    memoMap[key] = (memoMap[key]||0) + h.amount;
+  });
+  const total = Object.values(memoMap).reduce((s,v)=>s+v,0);
+  const sorted = Object.entries(memoMap).sort((a,b)=>b[1]-a[1]);
+  sorted.forEach(([memo, amt]) => {
+    const pct = total>0 ? Math.round(amt/total*100) : 0;
+    const row = document.createElement('div');
+    row.className = 'spend-bar-row';
+    row.innerHTML = `
+      <div class="spend-bar-label"><span>${memo}</span><span>¥${fmt(amt)}（${pct}%）</span></div>
+      <div class="spend-bar-track"><div class="spend-bar-fill" style="width:${pct}%"></div></div>`;
+    breakdown.appendChild(row);
+  });
 
   // AI評価
   const aiBox = document.getElementById('ai-output');
   aiBox.innerHTML = '<div class="ai-loading"><div class="spinner"></div>AIが分析中...</div>';
-
   const apiKey = LS.get(KEY_API);
   if(!apiKey){
-    aiBox.innerHTML = `<div class="ai-box" style="color:var(--muted)">設定画面でClaude APIキーを入力すると、ここにAIのコメントが表示されます。</div>`;
-    btn.disabled=false;
-    return;
+    aiBox.innerHTML = `<div class="ai-box" style="color:var(--muted)">APIキーを設定するとAI評価が表示されます。</div>`;
+    btn.disabled=false; return;
   }
 
-  const summary = wallets.map(w => {
-    const spent = spentInMonth(w.name, reportYear, reportMonth);
-    const pct   = w.budget>0 ? Math.round(spent/w.budget*100) : 0;
-    return `・${w.name}：予算¥${fmt(w.budget)}、使用¥${fmt(spent)}（${pct}%）`;
-  }).join('\n');
+  const spendList = sorted.map(([memo,amt])=>`・${memo}：¥${fmt(amt)}`).join('\n');
+  const tobaccoSpent = sorted.find(([m])=>m.includes('タバコ'))?.[1]||0;
 
-  const prompt = `あなたはやさしい家計アドバイザーです。
-以下は${reportYear}年${reportMonth}月のおこづかい使用状況です。
+  // 欲しいものリスト
+  const boughtThisMonth = wishList.filter(w => w.status==='bought' && w.boughtAt && w.boughtAt.startsWith(ym(reportYear,reportMonth)));
+  const wishSection = boughtThisMonth.length
+    ? '\n\n【今月購入したもの】\n' + boughtThisMonth.map(w=>`・${w.name}（¥${fmt(w.price)}）`).join('\n')
+    : '';
 
-${summary}
+  const prompt = `あなたは親しみやすい家計アドバイザーです。
 
-この結果について、以下の順番でコメントをしてください。
+【${reportYear}年${reportMonth}月の支出内訳（メモ別）】
+${spendList}
+合計：¥${fmt(total)}
+予算：¥${fmt(wallets.reduce((s,w)=>s+w.budget,0))}
+タバコ代：¥${fmt(tobaccoSpent)}（月の目標¥${fmt(fixedCosts.tobacco)}）${wishSection}
+
+以下の順でコメントしてください。
 1. 全体の評価（一言）
-2. よかった点（具体的に）
-3. 来月への注意点（あれば）
-4. 応援の一言
+2. 無駄遣いと思われる項目を具体的に指摘（あれば）
+3. タバコ代の評価（目標より少なければ思いっきり褒める）
+4. 来月への改善アドバイス
+5. 応援の一言
 
-文体はやわらかく話しかけるように。300文字以内でまとめてください。`;
+文体はやわらかく親しみやすく。450文字以内。`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-opus-4-5',
-        max_tokens: 600,
-        messages: [{ role:'user', content: prompt }]
-      })
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body: JSON.stringify({model:'claude-sonnet-4-6',max_tokens:900,messages:[{role:'user',content:prompt}]})
     });
     const data = await res.json();
-    if(data.error){ throw new Error(data.error.message); }
-    const text = data.content?.find(b=>b.type==='text')?.text || '';
+    if(data.error) throw new Error(data.error.message);
+    const text = data.content?.find(b=>b.type==='text')?.text||'';
     aiBox.innerHTML = `<div class="ai-box">${text.replace(/\n/g,'<br>')}</div>`;
-  } catch(e) {
-    aiBox.innerHTML = `<div class="ai-box" style="color:var(--danger)">エラー: ${e.message}<br><small>APIキーを確認してください。</small></div>`;
+  } catch(e){
+    aiBox.innerHTML = `<div class="ai-box" style="color:var(--danger)">エラー: ${e.message}</div>`;
   }
-  btn.disabled=false;
-  // 今月分の場合のみ繰越ボタンを表示
+  btn.disabled = false;
   const d = now();
   const isCurrentMonth = (reportYear===d.getFullYear() && reportMonth===d.getMonth()+1);
-  document.getElementById('rollover-btn').style.display = (hasData && isCurrentMonth) ? 'block' : 'none';
+  document.getElementById('rollover-btn').style.display = (isCurrentMonth) ? 'block' : 'none';
 }
 
 // ════════════════════════════════
@@ -1333,13 +1804,13 @@ function renderSummaryList(){
 }
 
 function showPage(id, tab){
-  if((walletsDirty || apiDirty) && currentPage === 'settings' && id !== 'settings'){
+  if((walletsDirty || apiDirty || fixedDirty) && currentPage === 'settings' && id !== 'settings'){
     const leave = window.confirm('設定が保存されていません。\nこのまま移動すると変更が失われます。\n移動しますか？');
     if(!leave) return;
-    walletsDirty = false;
-    apiDirty = false;
+    walletsDirty = false; apiDirty = false; fixedDirty = false;
     document.getElementById('save-wallets-btn').disabled = true;
     document.getElementById('save-api-btn').disabled = true;
+    document.getElementById('save-fixed-btn').disabled = true;
   }
   currentPage = id;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -1348,7 +1819,9 @@ function showPage(id, tab){
   tab.classList.add('active');
   if(id==='settings') renderSettings();
   if(id==='history')  renderHistory();
-  if(id==='report'){ updateReportMonthLabel(); renderSummaryList(); }
+  if(id==='report'){
+    switchReportTab('weekly');
+  }
   closePanel();
 }
 
@@ -1482,6 +1955,7 @@ renderSelect();
 renderHistory();
 updateReportMonthLabel();
 renderSummaryList();
+renderWeeklyStats();
 </script>
 </body>
 </html>
