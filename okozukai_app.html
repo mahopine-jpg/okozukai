@@ -576,23 +576,20 @@ body {
 
     <div class="sec-label" style="margin-top:12px">固定費・連絡先設定</div>
     <div class="setting-card">
+      <div class="setting-head">
+        <div class="setting-head-title">固定費一覧</div>
+        <div class="setting-head-sub" style="font-size:12px">項目名　　　¥上限</div>
+      </div>
+      <div id="fixed-settings"></div>
+    </div>
+    <button class="add-wallet-btn" onclick="addFixedItem()">＋ 固定費を追加</button>
+    <div class="setting-card" style="margin-top:8px">
       <div class="api-row">
-        <div class="api-label">毎月かかる固定費（AI分析に使用）</div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <span style="font-size:14px;font-weight:700;min-width:90px">ガソリン代</span>
-          <span class="budget-yen">¥</span>
-          <input type="number" class="inp-budget" id="fixed-gas" value="8500" inputmode="numeric" style="flex:1" oninput="markFixedDirty()">
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <span style="font-size:14px;font-weight:700;min-width:90px">タバコ代</span>
-          <span class="budget-yen">¥</span>
-          <input type="number" class="inp-budget" id="fixed-tobacco" value="10000" inputmode="numeric" style="flex:1" oninput="markFixedDirty()">
-        </div>
-        <div class="api-label" style="margin-top:4px">週次レポートの送り先メールアドレス</div>
+        <div class="api-label">週次レポートの送り先メールアドレス</div>
         <input type="email" class="inp-api" id="inp-email" placeholder="例：parent@example.com" oninput="markFixedDirty()" style="font-family:var(--sans)">
-        <button class="save-btn" id="save-fixed-btn" style="margin-top:4px" onclick="saveFixedSettings()" disabled>固定費・連絡先を保存</button>
       </div>
     </div>
+    <button class="save-btn" id="save-fixed-btn" onclick="saveFixedSettings()" disabled>固定費・連絡先を保存</button>
 
     <div class="sec-label" style="margin-top:12px">Claude API キー</div>
     <div class="setting-card">
@@ -712,7 +709,7 @@ const KEY_API      = 'wlt_apikey';
 const KEY_SAVINGS  = 'wlt_savings';
 const KEY_SUMMARY  = 'wlt_summary';
 const KEY_WISHLIST = 'wlt_wishlist';
-const KEY_FIXED    = 'wlt_fixed';    // {gas, tobacco, email}
+const KEY_FIXED    = 'wlt_fixed';    // {items:[{id,name,amount}], email}
 
 // ════════════════════════════════
 //  State
@@ -726,7 +723,33 @@ let history = LS.get(KEY_HISTORY) || [];
 let savings = LS.get(KEY_SAVINGS) || 0;
 let monthlySummaries = LS.get(KEY_SUMMARY) || [];
 let wishList = LS.get(KEY_WISHLIST) || [];
-let fixedCosts = LS.get(KEY_FIXED) || {gas:8500, tobacco:10000, email:''};
+
+// 旧フォーマット（{gas, tobacco, email}）→ 新フォーマット（{items, email}）の自動移行
+function loadFixedCosts(){
+  const raw = LS.get(KEY_FIXED);
+  if(!raw) return { items:[{id:'gas',name:'ガソリン代',amount:8500},{id:'tobacco',name:'タバコ代',amount:10000}], email:'' };
+  // 旧フォーマット判定
+  if('gas' in raw || 'tobacco' in raw){
+    const migrated = {
+      items:[
+        {id:'gas',     name:'ガソリン代', amount: raw.gas     || 8500},
+        {id:'tobacco', name:'タバコ代',   amount: raw.tobacco || 10000},
+      ],
+      email: raw.email || ''
+    };
+    LS.set(KEY_FIXED, migrated);
+    return migrated;
+  }
+  // 新フォーマットでitemsがない場合のフォールバック
+  if(!raw.items) raw.items = [];
+  return raw;
+}
+let fixedCosts = loadFixedCosts();
+
+// 固定費合計を返すヘルパー
+function fixedTotal(){ return fixedCosts.items.reduce((s,it)=>s+it.amount,0); }
+// タバコ上限（itemsの中からタバコ代を探す）
+function tobaccoLimit(){ const t=fixedCosts.items.find(it=>isTobacco(it.name)); return t?t.amount:0; }
 
 // 購入相談の一時保存
 let lastConsultName  = '';
@@ -1084,10 +1107,21 @@ function renderSettings(){
       <button class="del-btn" onclick="delWalletRow(${i})">×</button>`;
     c.appendChild(row);
   });
-  // 固定費・メール設定
-  document.getElementById('fixed-gas').value     = fixedCosts.gas;
-  document.getElementById('fixed-tobacco').value = fixedCosts.tobacco;
-  document.getElementById('inp-email').value     = fixedCosts.email||'';
+  // 固定費一覧
+  const fc = document.getElementById('fixed-settings');
+  fc.innerHTML = '';
+  fixedCosts.items.forEach((it, i) => {
+    const row = document.createElement('div');
+    row.className = 'wallet-row';
+    row.innerHTML = `
+      <input class="inp-name" type="text" value="${it.name}" placeholder="固定費名" oninput="markFixedDirty()">
+      <span class="budget-yen">¥</span>
+      <input class="inp-budget" type="number" value="${it.amount}" placeholder="0" inputmode="numeric" oninput="markFixedDirty()">
+      <button class="del-btn" onclick="delFixedItem(${i})">×</button>`;
+    fc.appendChild(row);
+  });
+  // メール設定
+  document.getElementById('inp-email').value = fixedCosts.email || '';
   // APIキー表示
   const stored = LS.get(KEY_API)||'';
   document.getElementById('inp-api').value = stored ? '●'.repeat(20) : '';
@@ -1099,15 +1133,38 @@ function markFixedDirty(){
   document.getElementById('save-fixed-btn').disabled = false;
 }
 function saveFixedSettings(){
+  const rows = document.querySelectorAll('#fixed-settings .wallet-row');
+  const items = Array.from(rows).map(row => {
+    const name   = row.querySelector('.inp-name').value.trim() || '固定費';
+    const amount = parseInt(row.querySelector('.inp-budget').value) || 0;
+    // 既存idを保持（タバコ・ガソリンの識別のため）
+    return { id: name, name, amount };
+  });
   fixedCosts = {
-    gas:     parseInt(document.getElementById('fixed-gas').value)||0,
-    tobacco: parseInt(document.getElementById('fixed-tobacco').value)||0,
-    email:   document.getElementById('inp-email').value.trim()
+    items,
+    email: document.getElementById('inp-email').value.trim()
   };
   LS.set(KEY_FIXED, fixedCosts);
   fixedDirty = false;
   document.getElementById('save-fixed-btn').disabled = true;
   showToast('✓ 固定費・連絡先を保存しました');
+}
+
+function addFixedItem(){
+  fixedCosts.items.push({id:'new_'+Date.now(), name:'', amount:0});
+  renderSettings();
+  const inputs = document.querySelectorAll('#fixed-settings .inp-name');
+  const last = inputs[inputs.length-1];
+  if(last){ last.focus(); last.select(); }
+  markFixedDirty();
+}
+
+function delFixedItem(i){
+  const name = fixedCosts.items[i]?.name || '';
+  if(name && !confirm(`「${name}」を削除しますか？`)) return;
+  fixedCosts.items.splice(i, 1);
+  renderSettings();
+  markFixedDirty();
 }
 
 function addWallet(){
@@ -1172,7 +1229,7 @@ function resetEverything(){
   if(!confirm('本当に削除してよいですか？この操作は元に戻せません。')) return;
   localStorage.clear();
   history=[]; savings=0; monthlySummaries=[]; wishList=[];
-  fixedCosts = {gas:8500, tobacco:10000, email:''};
+  fixedCosts = { items:[{id:'gas',name:'ガソリン代',amount:8500},{id:'tobacco',name:'タバコ代',amount:10000}], email:'' };
   wallets = [
     {name:'代表口座(デビット用)', budget:37500},
     {name:'財布(現金)',           budget:0},
@@ -1262,20 +1319,21 @@ function renderWeeklyStats(){
     .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer'
               && h.memo && (h.memo.includes('ガソリン')||h.memo.includes('給油')))
     .reduce((s,h)=>s+h.amount,0);
-  const gasRem = Math.max(0, fixedCosts.gas - gasSpent);
+  const gasItem  = fixedCosts.items.find(it=>it.name.includes('ガソリン'));
+  const gasLimit = gasItem ? gasItem.amount : 0;
+  const gasRem   = Math.max(0, gasLimit - gasSpent);
 
   // 自由費（予算 - 固定費合計）
   const d = now();
   const daysInMonth = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
   const remainDays  = daysInMonth - d.getDate();
-  const fixedTotal  = fixedCosts.gas + fixedCosts.tobacco;
   const freeRem     = totalRem - gasRem; // ガソリン残を引いた自由費残
 
   const c = document.getElementById('weekly-stats');
   c.innerHTML = `
     <div class="report-row"><div class="report-row-name">今週の支出</div><div class="report-row-right"><span class="report-row-val">¥${fmt(weekSpent)}</span></div></div>
     <div class="report-row"><div class="report-row-name">今月の残高</div><div class="report-row-right"><span class="report-row-val">¥${fmt(totalRem)}</span><span class="report-row-sub">残${remainDays}日</span></div></div>
-    <div class="report-row"><div class="report-row-name">タバコ代（今月）</div><div class="report-row-right"><span class="report-row-val">¥${fmt(tobaccoSpent)}</span><span class="report-row-sub">/ ¥${fmt(fixedCosts.tobacco)}</span></div></div>
+    <div class="report-row"><div class="report-row-name">タバコ代（今月）</div><div class="report-row-right"><span class="report-row-val">¥${fmt(tobaccoSpent)}</span><span class="report-row-sub">/ ¥${fmt(tobaccoLimit())}</span></div></div>
     <div class="report-row" style="border-bottom:none"><div class="report-row-name">自由費残り</div><div class="report-row-right"><span class="report-row-val">¥${fmt(freeRem)}</span></div></div>`;
 }
 
@@ -1310,9 +1368,21 @@ async function runWeeklyCheck(){
     .reduce((s,h)=>s+h.amount,0);
 
   const memoList = weekTx.map(h=>`・${h.memo||'（メモなし）'}：¥${fmt(h.amount)}`).join('\n') || '・記帳なし';
-  const tobaccoStatus = tobaccoSpent <= fixedCosts.tobacco
-    ? `今月のタバコ代は¥${fmt(tobaccoSpent)}（上限¥${fmt(fixedCosts.tobacco)}）で、まだ抑えられています。`
-    : `今月のタバコ代は¥${fmt(tobaccoSpent)}で、上限¥${fmt(fixedCosts.tobacco)}を超えています。`;
+
+  // 今月ペース計算
+  const dObj = now();
+  const daysInMonth2 = new Date(dObj.getFullYear(), dObj.getMonth()+1, 0).getDate();
+  const elapsedDays  = dObj.getDate();
+  const monthPct     = Math.round(elapsedDays / daysInMonth2 * 100);
+  const totalSpentSoFar = wallets.reduce((s,w)=>s+spentThisMonth(w.name),0);
+  const budgetPct    = totalBudget > 0 ? Math.round(totalSpentSoFar / totalBudget * 100) : 0;
+  const paceJudge    = budgetPct <= monthPct - 10 ? '余裕あり'
+                     : budgetPct <= monthPct + 5  ? 'ほぼ想定通り'
+                     : '使いすぎに注意';
+
+  const tobaccoStatus = tobaccoSpent <= tobaccoLimit()
+    ? `今月のタバコ代は¥${fmt(tobaccoSpent)}（上限¥${fmt(tobaccoLimit())}）で目標内です。`
+    : `今月のタバコ代は¥${fmt(tobaccoSpent)}で、上限¥${fmt(tobaccoLimit())}を超えています。`;
 
   // 欲しいものリスト（検討中）
   const wishItems = wishList.filter(w=>w.status==='considering');
@@ -1320,32 +1390,35 @@ async function runWeeklyCheck(){
     ? '\n\n【検討中の欲しいもの】\n' + wishItems.map(w=>`・${w.name}：¥${fmt(w.price)}（${w.plan||'計画未記録'}）`).join('\n')
     : '';
 
-  const freeTotal   = Math.max(0, totalBudget - fixedCosts.gas - fixedCosts.tobacco);
-  const freeSpentSoFar = Math.max(0, wallets.reduce((s,w)=>s+spentThisMonth(w.name),0) - fixedCosts.gas - tobaccoSpent);
+  const fixedItemsTotal = fixedTotal();
+  const freeTotal   = Math.max(0, totalBudget - fixedItemsTotal);
+  const freeSpentSoFar = Math.max(0, totalSpentSoFar - fixedItemsTotal + Math.max(0, fixedItemsTotal - tobaccoSpent));
+  const fixedListStr = fixedCosts.items.map(it=>`${it.name}¥${fmt(it.amount)}`).join('・');
 
-  const prompt = `あなたは親しみやすい家計アドバイザーです。成人した子供のおこづかい管理を親子で確認しています。
+  // 今週の目立った支出（上位3件）
+  const topSpend = [...weekTx].sort((a,b)=>b.amount-a.amount).slice(0,3)
+    .map(h=>`${h.memo||'（メモなし）'}¥${fmt(h.amount)}`).join('、') || 'なし';
+
+  const prompt = `あなたは家計アドバイザーです。成人男性のおこづかい管理の週次レポートです。
 
 【今週の支出明細】
 ${memoList}
 今週の合計：¥${fmt(weekSpent)}
+今週の目立った支出（上位3件）：${topSpend}
 
-【今月の状況】
+【今月のペース（${elapsedDays}日経過/${daysInMonth2}日、月の${monthPct}%）】
+予算消化率：${budgetPct}%（¥${fmt(totalSpentSoFar)}/¥${fmt(totalBudget)}）→ ${paceJudge}
 残高：¥${fmt(totalRem)}（残り${remainDays}日）
 ${tobaccoStatus}
-自由費（固定費ガソリン¥${fmt(fixedCosts.gas)}・タバコ¥${fmt(fixedCosts.tobacco)}を除いた予算）：¥${fmt(freeTotal)}
-自由費の使用済み：¥${fmt(freeSpentSoFar)}　残り：¥${fmt(Math.max(0,freeTotal-freeSpentSoFar))}${wishText}
-
-【アドバイスの観点】
-・遊興費は固定費ではなく「自分で調整できる費用」です。月の中で上手に配分できているかを見てあげてください。
-・「今週使いすぎたから来週は抑えよう」という自己調整ができているかを褒めたり、気づかせたりしてください。
+自由費（固定費${fixedListStr}を除いた予算）：¥${fmt(freeTotal)}、使用済み¥${fmt(freeSpentSoFar)}、残り¥${fmt(Math.max(0,freeTotal-freeSpentSoFar))}${wishText}
 
 以下の順でコメントしてください。
-1. 今週の振り返り（自由費の使い方・配分のバランスについて）
-2. タバコ代について（減っていたら思いっきり褒める。多ければ優しく指摘）
-3. 来週の自由費をどう使うかのアドバイス
-4. 応援メッセージ
+1. 今週の注目支出に触れながら全体の振り返り（事実ベースで端的に）
+2. 今月のペース評価（月経過${monthPct}%に対して予算消化${budgetPct}%という数字を使って具体的に）
+3. タバコ代の評価（目標内なら褒める、超えていたら優しく指摘）
+4. 来週・今月残りへの一言アドバイス
 
-文体はやわらかく親しみやすく。400文字以内。`;
+文体はフラットで簡潔に。読んだ瞬間に状況が把握できるよう、数字を積極的に使う。500文字以内。`;
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages',{
@@ -1369,7 +1442,8 @@ function shareWeeklyMail(){
   const d = now();
   const cym = currentYM();
   const totalBudget = wallets.reduce((s,w)=>s+w.budget,0);
-  const totalRem    = totalBudget - wallets.reduce((s,w)=>s+spentThisMonth(w.name),0);
+  const totalSpentSoFar = wallets.reduce((s,w)=>s+spentThisMonth(w.name),0);
+  const totalRem    = totalBudget - totalSpentSoFar;
   const tobaccoSpent = history
     .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer'
               && isTobacco(h.memo))
@@ -1381,20 +1455,54 @@ function shareWeeklyMail(){
   });
   const weekSpent = weekTx.reduce((s,h)=>s+h.amount,0);
 
+  // 今週の支出明細（日付順）
+  const sortedTx = [...weekTx].sort((a,b)=>{
+    const da = new Date(a.year,a.month-1,a.day), db = new Date(b.year,b.month-1,b.day);
+    return da - db || a.ts - b.ts;
+  });
+  const detailLines = sortedTx.length
+    ? sortedTx.map(h => {
+        const pad = s => s.length < 12 ? s + '　'.repeat(Math.ceil((12-s.length)/1)) : s;
+        return `  ${String(h.month).padStart(2,'0')}/${String(h.day).padStart(2,'0')}  ${(h.memo||'（メモなし）').padEnd(10,'　')}  ¥${fmt(h.amount)}`;
+      }).join('\n')
+    : '  記帳なし';
+
+  // 今月ペース
+  const daysInMonth3 = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  const elapsedDays3 = d.getDate();
+  const monthPct3    = Math.round(elapsedDays3 / daysInMonth3 * 100);
+  const budgetPct3   = totalBudget > 0 ? Math.round(totalSpentSoFar / totalBudget * 100) : 0;
+  const paceJudge3   = budgetPct3 <= monthPct3 - 10 ? '余裕あり'
+                     : budgetPct3 <= monthPct3 + 5  ? 'ほぼ想定通り'
+                     : '使いすぎに注意';
+  const remainDays3  = daysInMonth3 - elapsedDays3;
+
+  // 欲しいものリスト
   const wishItems = wishList.filter(w=>w.status==='considering');
   const wishSection = wishItems.length
-    ? '\n\n■ 検討中の欲しいもの\n' + wishItems.map(w=>`・${w.name}（¥${fmt(w.price)}）${w.plan||''}`).join('\n')
+    ? '\n■ 欲しいもの（検討中）\n' + wishItems.map(w=>`  ・${w.name}（¥${fmt(w.price)}）`).join('\n')
     : '';
 
   const subject = encodeURIComponent(`おこづかい週次レポート（${fmt2(mon)}〜${fmt2(sun)}）`);
   const body = encodeURIComponent(
 `おこづかい週次レポート ${fmt2(mon)}〜${fmt2(sun)}
+━━━━━━━━━━━━━━━━━━━━
 
-■ 今週の支出：¥${fmt(weekSpent)}
-■ 今月の残高：¥${fmt(totalRem)}
-■ タバコ代（今月）：¥${fmt(tobaccoSpent)} / ¥${fmt(fixedCosts.tobacco)}${wishSection}
+■ 今週の支出明細
+${detailLines}
+  ──────────────────
+  今週合計  ¥${fmt(weekSpent)}
 
-■ AIコメント
+■ 今月のペース（${elapsedDays3}日経過/${daysInMonth3}日中）
+  予算消化：¥${fmt(totalSpentSoFar)} / ¥${fmt(totalBudget)}（${budgetPct3}%）
+  月の経過：${monthPct3}%　→　${paceJudge3}
+  残高：¥${fmt(totalRem)}（残り${remainDays3}日）
+
+■ タバコ代（今月）
+  ¥${fmt(tobaccoSpent)} / ¥${fmt(tobaccoLimit())}（${tobaccoLimit()>0?Math.round(tobaccoSpent/tobaccoLimit()*100):'-'}%消化）
+${wishSection}
+━━━━━━━━━━━━━━━━━━━━
+■ 今週のAIコメント
 ${aiText}
 `);
   const to = encodeURIComponent(fixedCosts.email||'');
@@ -1427,9 +1535,10 @@ async function runConsult(){
   const d = now();
   const daysInMonth = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
   const remainDays  = daysInMonth - d.getDate();
-  const fixedRem    = fixedCosts.gas + fixedCosts.tobacco;
+  const fixedRem    = fixedTotal();
   const freeRem     = Math.max(0, totalRem - fixedRem);
-  const monthlyFree = Math.max(0, totalBudget - fixedCosts.gas - fixedCosts.tobacco);
+  const monthlyFree = Math.max(0, totalBudget - fixedTotal());
+  const fixedListStr2 = fixedCosts.items.map(it=>`${it.name}¥${fmt(it.amount)}`).join('・');
 
   const prompt = `あなたは親しみやすい家計アドバイザーです。
 
@@ -1439,7 +1548,7 @@ async function runConsult(){
 
 【現在の財務状況】
 今月の残高：¥${fmt(totalRem)}（残り${remainDays}日）
-固定費（ガソリン・タバコ）を除いた今月の自由費残り：¥${fmt(freeRem)}
+固定費（${fixedListStr2}）を除いた今月の自由費残り：¥${fmt(freeRem)}
 毎月の自由費（固定費除き）：¥${fmt(monthlyFree)}
 貯金口座の残高：¥${fmt(savings)}
 
@@ -1613,19 +1722,20 @@ async function runMonthlyReport(){
     : '';
 
   const monthlyBudget  = wallets.reduce((s,w)=>s+w.budget,0);
-  const freeTotal      = Math.max(0, monthlyBudget - fixedCosts.gas - fixedCosts.tobacco);
-  const freeSpent      = Math.max(0, total - fixedCosts.gas - tobaccoSpent);
+  const freeTotal      = Math.max(0, monthlyBudget - fixedTotal());
+  const freeSpent      = Math.max(0, total - tobaccoSpent - (fixedCosts.items.filter(it=>!isTobacco(it.name)).reduce((s,it)=>s+it.amount,0)));
+  const fixedListStr3  = fixedCosts.items.map(it=>`${it.name}¥${fmt(it.amount)}`).join('・');
 
   const prompt = `あなたは親しみやすい家計アドバイザーです。成人した子供のおこづかい管理を親子で振り返っています。
 
 【${reportYear}年${reportMonth}月の支出内訳（メモ別）】
 ${spendList}
 合計：¥${fmt(total)}　予算：¥${fmt(monthlyBudget)}
-タバコ代：¥${fmt(tobaccoSpent)}（月の目標¥${fmt(fixedCosts.tobacco)}）
-自由費（固定費ガソリン・タバコを除く）：予算¥${fmt(freeTotal)}　実績¥${fmt(freeSpent)}${wishSection}
+タバコ代：¥${fmt(tobaccoSpent)}（月の目標¥${fmt(tobaccoLimit())}）
+自由費（固定費${fixedListStr3}を除く）：予算¥${fmt(freeTotal)}　実績¥${fmt(freeSpent)}${wishSection}
 
 【アドバイスの観点】
-・遊興費・外食・趣味などは「自分で調整できる費用」です。固定費を払ったうえで残った自由費をどう配分したかを評価してください。
+・遊興費・外食・趣味などは「自分で調整できる費用」です。固定費（${fixedListStr3}）を払ったうえで残った自由費をどう配分したかを評価してください。
 ・「月の前半に使いすぎず後半まで持たせる」「使いたいものに優先順位をつける」といった自己管理の練習として捉えてコメントしてください。
 
 以下の順でコメントしてください。
