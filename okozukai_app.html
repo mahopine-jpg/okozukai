@@ -127,6 +127,9 @@ body {
 }
 .h-del:active { color: var(--danger); }
 .h-tag-transfer { background: #e8f0fe; color: #1a4a8a; }
+.h-tag-savings { background: #e1f0e8; color: #1a7a4a; }
+.h-tag-savings-buy { background: #e1f0e8; color: #1a7a4a; }
+.h-tag-savings-adj-up { background: #e6f4ec; color: #1a7a4a; }
 .h-amount-in { font-size: 18px; font-weight: 900; color: var(--ok); }
 
 /* ── Panel tabs ── */
@@ -576,20 +579,23 @@ body {
 
     <div class="sec-label" style="margin-top:12px">固定費・連絡先設定</div>
     <div class="setting-card">
-      <div class="setting-head">
-        <div class="setting-head-title">固定費一覧</div>
-        <div class="setting-head-sub" style="font-size:12px">項目名　　　¥上限</div>
-      </div>
-      <div id="fixed-settings"></div>
-    </div>
-    <button class="add-wallet-btn" onclick="addFixedItem()">＋ 固定費を追加</button>
-    <div class="setting-card" style="margin-top:8px">
       <div class="api-row">
-        <div class="api-label">週次レポートの送り先メールアドレス</div>
+        <div class="api-label">毎月かかる固定費（AI分析に使用）</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="font-size:14px;font-weight:700;min-width:90px">ガソリン代</span>
+          <span class="budget-yen">¥</span>
+          <input type="number" class="inp-budget" id="fixed-gas" value="8500" inputmode="numeric" style="flex:1" oninput="markFixedDirty()">
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="font-size:14px;font-weight:700;min-width:90px">タバコ代</span>
+          <span class="budget-yen">¥</span>
+          <input type="number" class="inp-budget" id="fixed-tobacco" value="10000" inputmode="numeric" style="flex:1" oninput="markFixedDirty()">
+        </div>
+        <div class="api-label" style="margin-top:4px">週次レポートの送り先メールアドレス</div>
         <input type="email" class="inp-api" id="inp-email" placeholder="例：parent@example.com" oninput="markFixedDirty()" style="font-family:var(--sans)">
+        <button class="save-btn" id="save-fixed-btn" style="margin-top:4px" onclick="saveFixedSettings()" disabled>固定費・連絡先を保存</button>
       </div>
     </div>
-    <button class="save-btn" id="save-fixed-btn" onclick="saveFixedSettings()" disabled>固定費・連絡先を保存</button>
 
     <div class="sec-label" style="margin-top:12px">Claude API キー</div>
     <div class="setting-card">
@@ -602,17 +608,7 @@ body {
     </div>
 
     <div class="sec-label" style="margin-top:12px">データ管理</div>
-    <div class="setting-card">
-      <div style="padding:14px;display:flex;flex-direction:column;gap:8px">
-        <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:4px">バックアップ・復元</div>
-        <button class="export-btn" onclick="exportBackup()">💾 全データをバックアップ（JSON）</button>
-        <div style="font-size:12px;font-weight:500;color:var(--muted);line-height:1.6">アプリ更新前・機種変更前に保存しておくと安心です。口座設定・記帳履歴・貯金残高・固定費・欲しいものリストをすべて含みます。APIキーは含まれません。</div>
-        <button class="export-btn" onclick="document.getElementById('restore-input').click()" style="margin-top:4px">📂 バックアップから復元（JSON）</button>
-        <input type="file" id="restore-input" accept=".json" style="display:none" onchange="importBackup(this)">
-        <div style="font-size:12px;font-weight:500;color:var(--muted);line-height:1.6">復元すると現在のデータはすべて上書きされます。</div>
-      </div>
-    </div>
-    <div class="setting-card danger-zone" style="margin-top:8px">
+    <div class="setting-card danger-zone">
       <div style="padding:14px;display:flex;flex-direction:column;gap:8px">
         <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:4px">月次繰越は「集計」タブから行ってください</div>
         <button class="reset-btn" onclick="resetAllData()">⚠ すべてのデータをリセット（初期化）</button>
@@ -701,6 +697,45 @@ body {
   </div>
 </div>
 
+<!-- ════ SAVINGS MODAL ════ -->
+<div id="savings-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:300;align-items:flex-end;justify-content:center" onclick="closeSavingsModal(event)">
+  <div id="savings-modal" style="background:var(--surface);border-radius:20px 20px 0 0;padding:20px 20px 44px;width:100%;max-width:480px;box-sizing:border-box" onclick="event.stopPropagation()">
+    <div style="width:36px;height:3px;background:var(--border2);border-radius:2px;margin:0 auto 16px"></div>
+    <div id="savings-modal-title" style="font-size:13px;font-weight:700;color:var(--muted);letter-spacing:1px;margin-bottom:14px">貯金口座から引き出す</div>
+    <!-- 引き出しフォーム -->
+    <div id="savings-withdraw-form">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px">現在の残高：<span id="sw-current">¥0</span></div>
+      <div class="quick-row" style="margin-bottom:8px">
+        <button class="q-btn" onclick="swq(1000)">¥1,000</button>
+        <button class="q-btn" onclick="swq(3000)">¥3,000</button>
+        <button class="q-btn" onclick="swq(5000)">¥5,000</button>
+        <button class="q-btn" onclick="swq(10000)">¥10,000</button>
+        <button class="q-btn" onclick="swq(30000)">¥30,000</button>
+      </div>
+      <div class="field-row" style="align-items:center;margin-bottom:8px">
+        <span class="yen" style="flex-shrink:0">¥</span>
+        <input type="number" class="inp-amount" id="sw-amount" placeholder="0" inputmode="numeric" oninput="swCheckBtn()" style="flex:1;min-width:0;width:100%">
+      </div>
+      <input type="text" class="inp-memo" id="sw-memo" placeholder="メモ（任意）" style="margin-bottom:8px">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px">引き出し後の残高：<span id="sw-after" style="color:var(--text)">—</span></div>
+      <button class="add-btn" id="sw-btn" onclick="doSavingsWithdraw()" disabled style="margin-top:10px">引き出す</button>
+    </div>
+    <!-- 残高修正フォーム -->
+    <div id="savings-adjust-form" style="display:none">
+      <div style="font-size:13px;font-weight:500;color:var(--muted);margin-bottom:10px;line-height:1.7">銀行口座の実際の残高を入力してください。差額は<strong style="color:var(--text)">「使途不明金」</strong>として記録に残ります。</div>
+      <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px">現在のアプリ残高：<span id="sa-current">¥0</span></div>
+      <div class="field-row" style="align-items:center;margin-bottom:8px">
+        <span class="yen" style="flex-shrink:0">¥</span>
+        <input type="number" class="inp-amount" id="sa-amount" placeholder="銀行口座の残高を入力" inputmode="numeric" oninput="saCheckBtn()" style="flex:1;min-width:0;width:100%">
+      </div>
+      <div id="sa-diff-row" style="display:none;font-size:12px;font-weight:700;margin-bottom:8px;padding:9px 12px;border-radius:8px;background:var(--bg)">
+        <span id="sa-diff-text"></span>
+      </div>
+      <button class="add-btn" id="sa-btn" onclick="doSavingsAdjust()" disabled style="margin-top:4px">この金額に修正する</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -719,48 +754,21 @@ const KEY_API      = 'wlt_apikey';
 const KEY_SAVINGS  = 'wlt_savings';
 const KEY_SUMMARY  = 'wlt_summary';
 const KEY_WISHLIST = 'wlt_wishlist';
-const KEY_FIXED    = 'wlt_fixed';    // {items:[{id,name,amount}], email}
+const KEY_FIXED    = 'wlt_fixed';    // {gas, tobacco, email}
 
 // ════════════════════════════════
 //  State
 // ════════════════════════════════
 let wallets = LS.get(KEY_WALLETS) || [
-  {name:'代表口座(デビット用)', budget:47500},
+  {name:'代表口座(デビット用)', budget:37500},
   {name:'財布(現金)',           budget:0},
   {name:'PayPay',              budget:0},
-  {name:'Suica',               budget:0},
 ];
 let history = LS.get(KEY_HISTORY) || [];
 let savings = LS.get(KEY_SAVINGS) || 0;
 let monthlySummaries = LS.get(KEY_SUMMARY) || [];
 let wishList = LS.get(KEY_WISHLIST) || [];
-
-// 旧フォーマット（{gas, tobacco, email}）→ 新フォーマット（{items, email}）の自動移行
-function loadFixedCosts(){
-  const raw = LS.get(KEY_FIXED);
-  if(!raw) return { items:[{id:'gas',name:'ガソリン代',amount:8500},{id:'tobacco',name:'タバコ代',amount:8000},{id:'parking',name:'駐車場定期代',amount:10000}], email:'' };
-  // 旧フォーマット判定
-  if('gas' in raw || 'tobacco' in raw){
-    const migrated = {
-      items:[
-        {id:'gas',     name:'ガソリン代', amount: raw.gas     || 8500},
-        {id:'tobacco', name:'タバコ代',   amount: raw.tobacco || 10000},
-      ],
-      email: raw.email || ''
-    };
-    LS.set(KEY_FIXED, migrated);
-    return migrated;
-  }
-  // 新フォーマットでitemsがない場合のフォールバック
-  if(!raw.items) raw.items = [];
-  return raw;
-}
-let fixedCosts = loadFixedCosts();
-
-// 固定費合計を返すヘルパー
-function fixedTotal(){ return fixedCosts.items.reduce((s,it)=>s+it.amount,0); }
-// タバコ上限（itemsの中からタバコ代を探す）
-function tobaccoLimit(){ const t=fixedCosts.items.find(it=>isTobacco(it.name)); return t?t.amount:0; }
+let fixedCosts = LS.get(KEY_FIXED) || {gas:8500, tobacco:10000, email:''};
 
 // 購入相談の一時保存
 let lastConsultName  = '';
@@ -837,6 +845,11 @@ function renderHome(){
     <div class="card-bottom" style="margin-top:10px">
       <div class="card-remaining ok">¥${fmt(savings)}</div>
       <div class="card-budget">累計残金</div>
+    </div>
+    <hr style="border:none;border-top:1px solid var(--border);margin:12px 0 10px">
+    <div style="display:flex;gap:8px">
+      <button onclick="openSavingsWithdraw(event)" style="flex:1;background:var(--text);color:#fff;border:none;border-radius:10px;padding:9px 0;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer">💸 引き出す</button>
+      <button onclick="openSavingsAdjust(event)" style="flex:1;background:var(--bg);color:var(--muted);border:1.5px solid var(--border);border-radius:10px;padding:9px 0;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer">✏️ 残高修正</button>
     </div>`;
 
   const container = document.getElementById('cards');
@@ -888,7 +901,9 @@ function renderHistory(){
     const d = document.createElement('div');
     d.className = 'h-item';
     const dateStr = `${String(h.month).padStart(2,'0')}/${String(h.day).padStart(2,'0')}`;
-    const isTransfer = h.type === 'transfer';
+    const isTransfer    = h.type === 'transfer';
+    const isSavingsW    = h.type === 'savings_withdraw';
+    const isSavingsAdj  = h.type === 'savings_adjust';
     const isIn = isTransfer && h.transferDir === 'in';
     let tagLabel, tagClass, amountHtml, delBtn;
     if(isTransfer){
@@ -897,8 +912,20 @@ function renderHistory(){
       amountHtml = isIn
         ? `<div class="h-amount-in">+¥${fmt(h.amount)}</div>`
         : `<div class="h-amount">−¥${fmt(h.amount)}</div>`;
-      // 移動はペアごとに削除
       delBtn = isIn ? '' : `<button class="h-del" onclick="deleteTransfer('${h.id}',event)" title="削除">×</button>`;
+    } else if(isSavingsW){
+      tagLabel = '🏦 貯金引き出し';
+      tagClass = 'h-tag' + (h.wishItemId ? ' h-tag-savings-buy' : ' h-tag-savings');
+      amountHtml = `<div class="h-amount">−¥${fmt(h.amount)}</div>`;
+      delBtn = `<button class="h-del" onclick="deleteSavingsTx('${h.id}',${h.amount},event)" title="削除">×</button>`;
+    } else if(isSavingsAdj){
+      const isIncrease = h.diff > 0;
+      tagLabel = isIncrease ? '🏦 残高調整（増）' : '🏦 使途不明金';
+      tagClass = 'h-tag h-tag-savings' + (isIncrease ? '-adj-up' : '');
+      amountHtml = isIncrease
+        ? `<div class="h-amount-in">+¥${fmt(h.amount)}</div>`
+        : `<div class="h-amount">−¥${fmt(h.amount)}</div>`;
+      delBtn = '';
     } else {
       tagLabel = h.walletName;
       tagClass = 'h-tag';
@@ -1101,6 +1128,18 @@ function deleteTx(id, e){
   showToast('削除しました');
 }
 
+function deleteSavingsTx(id, amount, e){
+  e.stopPropagation();
+  if(!confirm('この貯金引き出し記録を削除しますか？
+（貯金残高に金額が戻ります）')) return;
+  history = history.filter(h=>h.id!==id);
+  LS.set(KEY_HISTORY, history);
+  savings += amount;
+  LS.set(KEY_SAVINGS, savings);
+  renderHistory(); renderHome(); renderWishList();
+  showToast('削除しました（残高を戻しました）');
+}
+
 // ════════════════════════════════
 //  Settings
 // ════════════════════════════════
@@ -1118,21 +1157,10 @@ function renderSettings(){
       <button class="del-btn" onclick="delWalletRow(${i})">×</button>`;
     c.appendChild(row);
   });
-  // 固定費一覧
-  const fc = document.getElementById('fixed-settings');
-  fc.innerHTML = '';
-  fixedCosts.items.forEach((it, i) => {
-    const row = document.createElement('div');
-    row.className = 'wallet-row';
-    row.innerHTML = `
-      <input class="inp-name" type="text" value="${it.name}" placeholder="固定費名" oninput="markFixedDirty()">
-      <span class="budget-yen">¥</span>
-      <input class="inp-budget" type="number" value="${it.amount}" placeholder="0" inputmode="numeric" oninput="markFixedDirty()">
-      <button class="del-btn" onclick="delFixedItem(${i})">×</button>`;
-    fc.appendChild(row);
-  });
-  // メール設定
-  document.getElementById('inp-email').value = fixedCosts.email || '';
+  // 固定費・メール設定
+  document.getElementById('fixed-gas').value     = fixedCosts.gas;
+  document.getElementById('fixed-tobacco').value = fixedCosts.tobacco;
+  document.getElementById('inp-email').value     = fixedCosts.email||'';
   // APIキー表示
   const stored = LS.get(KEY_API)||'';
   document.getElementById('inp-api').value = stored ? '●'.repeat(20) : '';
@@ -1144,38 +1172,15 @@ function markFixedDirty(){
   document.getElementById('save-fixed-btn').disabled = false;
 }
 function saveFixedSettings(){
-  const rows = document.querySelectorAll('#fixed-settings .wallet-row');
-  const items = Array.from(rows).map(row => {
-    const name   = row.querySelector('.inp-name').value.trim() || '固定費';
-    const amount = parseInt(row.querySelector('.inp-budget').value) || 0;
-    // 既存idを保持（タバコ・ガソリンの識別のため）
-    return { id: name, name, amount };
-  });
   fixedCosts = {
-    items,
-    email: document.getElementById('inp-email').value.trim()
+    gas:     parseInt(document.getElementById('fixed-gas').value)||0,
+    tobacco: parseInt(document.getElementById('fixed-tobacco').value)||0,
+    email:   document.getElementById('inp-email').value.trim()
   };
   LS.set(KEY_FIXED, fixedCosts);
   fixedDirty = false;
   document.getElementById('save-fixed-btn').disabled = true;
   showToast('✓ 固定費・連絡先を保存しました');
-}
-
-function addFixedItem(){
-  fixedCosts.items.push({id:'new_'+Date.now(), name:'', amount:0});
-  renderSettings();
-  const inputs = document.querySelectorAll('#fixed-settings .inp-name');
-  const last = inputs[inputs.length-1];
-  if(last){ last.focus(); last.select(); }
-  markFixedDirty();
-}
-
-function delFixedItem(i){
-  const name = fixedCosts.items[i]?.name || '';
-  if(name && !confirm(`「${name}」を削除しますか？`)) return;
-  fixedCosts.items.splice(i, 1);
-  renderSettings();
-  markFixedDirty();
 }
 
 function addWallet(){
@@ -1240,70 +1245,14 @@ function resetEverything(){
   if(!confirm('本当に削除してよいですか？この操作は元に戻せません。')) return;
   localStorage.clear();
   history=[]; savings=0; monthlySummaries=[]; wishList=[];
-  fixedCosts = { items:[{id:'gas',name:'ガソリン代',amount:8500},{id:'tobacco',name:'タバコ代',amount:8000},{id:'parking',name:'駐車場定期代',amount:10000}], email:'' };
+  fixedCosts = {gas:8500, tobacco:10000, email:''};
   wallets = [
-    {name:'代表口座(デビット用)', budget:47500},
+    {name:'代表口座(デビット用)', budget:37500},
     {name:'財布(現金)',           budget:0},
     {name:'PayPay',              budget:0},
-    {name:'Suica',               budget:0},
   ];
   renderHome(); renderHistory(); renderSummaryList(); renderSelect(); renderSettings();
   showToast('完全リセットしました');
-}
-
-// ════════════════════════════════
-//  バックアップ・復元
-// ════════════════════════════════
-function exportBackup(){
-  const data = {
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    wallets:          LS.get(KEY_WALLETS)  || wallets,
-    history:          LS.get(KEY_HISTORY)  || history,
-    savings:          LS.get(KEY_SAVINGS)  || savings,
-    monthlySummaries: LS.get(KEY_SUMMARY)  || monthlySummaries,
-    wishList:         LS.get(KEY_WISHLIST) || wishList,
-    fixedCosts:       LS.get(KEY_FIXED)    || fixedCosts,
-  };
-  const json = JSON.stringify(data, null, 2);
-  const blob = new Blob([json], {type: 'application/json'});
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  const d    = new Date();
-  const dateStr = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
-  a.href     = url;
-  a.download = `okozukai_backup_${dateStr}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('💾 バックアップを保存しました');
-}
-
-function importBackup(input){
-  if(!input.files||!input.files[0]) return;
-  if(!confirm('バックアップから復元します。\n現在のデータはすべて上書きされます。\nよろしいですか？')) {
-    input.value=''; return;
-  }
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const data = JSON.parse(e.target.result);
-      if(!data.version || !data.wallets || !data.history){
-        showToast('ファイルが正しくありません'); return;
-      }
-      if(data.wallets)          { wallets = data.wallets;                    LS.set(KEY_WALLETS,  wallets); }
-      if(data.history)          { history = data.history;                    LS.set(KEY_HISTORY,  history); }
-      if(data.savings!=null)    { savings = data.savings;                    LS.set(KEY_SAVINGS,  savings); }
-      if(data.monthlySummaries) { monthlySummaries = data.monthlySummaries;  LS.set(KEY_SUMMARY,  monthlySummaries); }
-      if(data.wishList)         { wishList = data.wishList;                  LS.set(KEY_WISHLIST, wishList); }
-      if(data.fixedCosts)       { fixedCosts = data.fixedCosts;              LS.set(KEY_FIXED,    fixedCosts); }
-      renderHome(); renderHistory(); renderSummaryList(); renderSelect(); renderSettings();
-      showToast('✓ バックアップから復元しました');
-    } catch(err) {
-      showToast('読み込みに失敗しました。ファイルを確認してください');
-    }
-    input.value='';
-  };
-  reader.readAsText(input.files[0]);
 }
 
 // ════════════════════════════════
@@ -1386,21 +1335,20 @@ function renderWeeklyStats(){
     .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer'
               && h.memo && (h.memo.includes('ガソリン')||h.memo.includes('給油')))
     .reduce((s,h)=>s+h.amount,0);
-  const gasItem  = fixedCosts.items.find(it=>it.name.includes('ガソリン'));
-  const gasLimit = gasItem ? gasItem.amount : 0;
-  const gasRem   = Math.max(0, gasLimit - gasSpent);
+  const gasRem = Math.max(0, fixedCosts.gas - gasSpent);
 
   // 自由費（予算 - 固定費合計）
   const d = now();
   const daysInMonth = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
   const remainDays  = daysInMonth - d.getDate();
+  const fixedTotal  = fixedCosts.gas + fixedCosts.tobacco;
   const freeRem     = totalRem - gasRem; // ガソリン残を引いた自由費残
 
   const c = document.getElementById('weekly-stats');
   c.innerHTML = `
     <div class="report-row"><div class="report-row-name">今週の支出</div><div class="report-row-right"><span class="report-row-val">¥${fmt(weekSpent)}</span></div></div>
     <div class="report-row"><div class="report-row-name">今月の残高</div><div class="report-row-right"><span class="report-row-val">¥${fmt(totalRem)}</span><span class="report-row-sub">残${remainDays}日</span></div></div>
-    <div class="report-row"><div class="report-row-name">タバコ代（今月）</div><div class="report-row-right"><span class="report-row-val">¥${fmt(tobaccoSpent)}</span><span class="report-row-sub">/ ¥${fmt(tobaccoLimit())}</span></div></div>
+    <div class="report-row"><div class="report-row-name">タバコ代（今月）</div><div class="report-row-right"><span class="report-row-val">¥${fmt(tobaccoSpent)}</span><span class="report-row-sub">/ ¥${fmt(fixedCosts.tobacco)}</span></div></div>
     <div class="report-row" style="border-bottom:none"><div class="report-row-name">自由費残り</div><div class="report-row-right"><span class="report-row-val">¥${fmt(freeRem)}</span></div></div>`;
 }
 
@@ -1435,21 +1383,9 @@ async function runWeeklyCheck(){
     .reduce((s,h)=>s+h.amount,0);
 
   const memoList = weekTx.map(h=>`・${h.memo||'（メモなし）'}：¥${fmt(h.amount)}`).join('\n') || '・記帳なし';
-
-  // 今月ペース計算
-  const dObj = now();
-  const daysInMonth2 = new Date(dObj.getFullYear(), dObj.getMonth()+1, 0).getDate();
-  const elapsedDays  = dObj.getDate();
-  const monthPct     = Math.round(elapsedDays / daysInMonth2 * 100);
-  const totalSpentSoFar = wallets.reduce((s,w)=>s+spentThisMonth(w.name),0);
-  const budgetPct    = totalBudget > 0 ? Math.round(totalSpentSoFar / totalBudget * 100) : 0;
-  const paceJudge    = budgetPct <= monthPct - 10 ? '余裕あり'
-                     : budgetPct <= monthPct + 5  ? 'ほぼ想定通り'
-                     : '使いすぎに注意';
-
-  const tobaccoStatus = tobaccoSpent <= tobaccoLimit()
-    ? `今月のタバコ代は¥${fmt(tobaccoSpent)}（上限¥${fmt(tobaccoLimit())}）で目標内です。`
-    : `今月のタバコ代は¥${fmt(tobaccoSpent)}で、上限¥${fmt(tobaccoLimit())}を超えています。`;
+  const tobaccoStatus = tobaccoSpent <= fixedCosts.tobacco
+    ? `今月のタバコ代は¥${fmt(tobaccoSpent)}（上限¥${fmt(fixedCosts.tobacco)}）で、まだ抑えられています。`
+    : `今月のタバコ代は¥${fmt(tobaccoSpent)}で、上限¥${fmt(fixedCosts.tobacco)}を超えています。`;
 
   // 欲しいものリスト（検討中）
   const wishItems = wishList.filter(w=>w.status==='considering');
@@ -1457,35 +1393,32 @@ async function runWeeklyCheck(){
     ? '\n\n【検討中の欲しいもの】\n' + wishItems.map(w=>`・${w.name}：¥${fmt(w.price)}（${w.plan||'計画未記録'}）`).join('\n')
     : '';
 
-  const fixedItemsTotal = fixedTotal();
-  const freeTotal   = Math.max(0, totalBudget - fixedItemsTotal);
-  const freeSpentSoFar = Math.max(0, totalSpentSoFar - fixedItemsTotal + Math.max(0, fixedItemsTotal - tobaccoSpent));
-  const fixedListStr = fixedCosts.items.map(it=>`${it.name}¥${fmt(it.amount)}`).join('・');
+  const freeTotal   = Math.max(0, totalBudget - fixedCosts.gas - fixedCosts.tobacco);
+  const freeSpentSoFar = Math.max(0, wallets.reduce((s,w)=>s+spentThisMonth(w.name),0) - fixedCosts.gas - tobaccoSpent);
 
-  // 今週の目立った支出（上位3件）
-  const topSpend = [...weekTx].sort((a,b)=>b.amount-a.amount).slice(0,3)
-    .map(h=>`${h.memo||'（メモなし）'}¥${fmt(h.amount)}`).join('、') || 'なし';
-
-  const prompt = `あなたは家計アドバイザーです。成人男性のおこづかい管理の週次レポートです。
+  const prompt = `あなたは親しみやすい家計アドバイザーです。成人した子供のおこづかい管理を親子で確認しています。
 
 【今週の支出明細】
 ${memoList}
 今週の合計：¥${fmt(weekSpent)}
-今週の目立った支出（上位3件）：${topSpend}
 
-【今月のペース（${elapsedDays}日経過/${daysInMonth2}日、月の${monthPct}%）】
-予算消化率：${budgetPct}%（¥${fmt(totalSpentSoFar)}/¥${fmt(totalBudget)}）→ ${paceJudge}
+【今月の状況】
 残高：¥${fmt(totalRem)}（残り${remainDays}日）
 ${tobaccoStatus}
-自由費（固定費${fixedListStr}を除いた予算）：¥${fmt(freeTotal)}、使用済み¥${fmt(freeSpentSoFar)}、残り¥${fmt(Math.max(0,freeTotal-freeSpentSoFar))}${wishText}
+自由費（固定費ガソリン¥${fmt(fixedCosts.gas)}・タバコ¥${fmt(fixedCosts.tobacco)}を除いた予算）：¥${fmt(freeTotal)}
+自由費の使用済み：¥${fmt(freeSpentSoFar)}　残り：¥${fmt(Math.max(0,freeTotal-freeSpentSoFar))}${wishText}
+
+【アドバイスの観点】
+・遊興費は固定費ではなく「自分で調整できる費用」です。月の中で上手に配分できているかを見てあげてください。
+・「今週使いすぎたから来週は抑えよう」という自己調整ができているかを褒めたり、気づかせたりしてください。
 
 以下の順でコメントしてください。
-1. 今週の注目支出に触れながら全体の振り返り（事実ベースで端的に）
-2. 今月のペース評価（月経過${monthPct}%に対して予算消化${budgetPct}%という数字を使って具体的に）
-3. タバコ代の評価（目標内なら褒める、超えていたら優しく指摘）
-4. 来週・今月残りへの一言アドバイス
+1. 今週の振り返り（自由費の使い方・配分のバランスについて）
+2. タバコ代について（減っていたら思いっきり褒める。多ければ優しく指摘）
+3. 来週の自由費をどう使うかのアドバイス
+4. 応援メッセージ
 
-文体はフラットで簡潔に。読んだ瞬間に状況が把握できるよう、数字を積極的に使う。500文字以内。`;
+文体はやわらかく親しみやすく。400文字以内。`;
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages',{
@@ -1509,8 +1442,7 @@ function shareWeeklyMail(){
   const d = now();
   const cym = currentYM();
   const totalBudget = wallets.reduce((s,w)=>s+w.budget,0);
-  const totalSpentSoFar = wallets.reduce((s,w)=>s+spentThisMonth(w.name),0);
-  const totalRem    = totalBudget - totalSpentSoFar;
+  const totalRem    = totalBudget - wallets.reduce((s,w)=>s+spentThisMonth(w.name),0);
   const tobaccoSpent = history
     .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer'
               && isTobacco(h.memo))
@@ -1522,54 +1454,20 @@ function shareWeeklyMail(){
   });
   const weekSpent = weekTx.reduce((s,h)=>s+h.amount,0);
 
-  // 今週の支出明細（日付順）
-  const sortedTx = [...weekTx].sort((a,b)=>{
-    const da = new Date(a.year,a.month-1,a.day), db = new Date(b.year,b.month-1,b.day);
-    return da - db || a.ts - b.ts;
-  });
-  const detailLines = sortedTx.length
-    ? sortedTx.map(h => {
-        const pad = s => s.length < 12 ? s + '　'.repeat(Math.ceil((12-s.length)/1)) : s;
-        return `  ${String(h.month).padStart(2,'0')}/${String(h.day).padStart(2,'0')}  ${(h.memo||'（メモなし）').padEnd(10,'　')}  ¥${fmt(h.amount)}`;
-      }).join('\n')
-    : '  記帳なし';
-
-  // 今月ペース
-  const daysInMonth3 = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
-  const elapsedDays3 = d.getDate();
-  const monthPct3    = Math.round(elapsedDays3 / daysInMonth3 * 100);
-  const budgetPct3   = totalBudget > 0 ? Math.round(totalSpentSoFar / totalBudget * 100) : 0;
-  const paceJudge3   = budgetPct3 <= monthPct3 - 10 ? '余裕あり'
-                     : budgetPct3 <= monthPct3 + 5  ? 'ほぼ想定通り'
-                     : '使いすぎに注意';
-  const remainDays3  = daysInMonth3 - elapsedDays3;
-
-  // 欲しいものリスト
   const wishItems = wishList.filter(w=>w.status==='considering');
   const wishSection = wishItems.length
-    ? '\n■ 欲しいもの（検討中）\n' + wishItems.map(w=>`  ・${w.name}（¥${fmt(w.price)}）`).join('\n')
+    ? '\n\n■ 検討中の欲しいもの\n' + wishItems.map(w=>`・${w.name}（¥${fmt(w.price)}）${w.plan||''}`).join('\n')
     : '';
 
   const subject = encodeURIComponent(`おこづかい週次レポート（${fmt2(mon)}〜${fmt2(sun)}）`);
   const body = encodeURIComponent(
 `おこづかい週次レポート ${fmt2(mon)}〜${fmt2(sun)}
-━━━━━━━━━━━━━━━━━━━━
 
-■ 今週の支出明細
-${detailLines}
-  ──────────────────
-  今週合計  ¥${fmt(weekSpent)}
+■ 今週の支出：¥${fmt(weekSpent)}
+■ 今月の残高：¥${fmt(totalRem)}
+■ タバコ代（今月）：¥${fmt(tobaccoSpent)} / ¥${fmt(fixedCosts.tobacco)}${wishSection}
 
-■ 今月のペース（${elapsedDays3}日経過/${daysInMonth3}日中）
-  予算消化：¥${fmt(totalSpentSoFar)} / ¥${fmt(totalBudget)}（${budgetPct3}%）
-  月の経過：${monthPct3}%　→　${paceJudge3}
-  残高：¥${fmt(totalRem)}（残り${remainDays3}日）
-
-■ タバコ代（今月）
-  ¥${fmt(tobaccoSpent)} / ¥${fmt(tobaccoLimit())}（${tobaccoLimit()>0?Math.round(tobaccoSpent/tobaccoLimit()*100):'-'}%消化）
-${wishSection}
-━━━━━━━━━━━━━━━━━━━━
-■ 今週のAIコメント
+■ AIコメント
 ${aiText}
 `);
   const to = encodeURIComponent(fixedCosts.email||'');
@@ -1602,10 +1500,9 @@ async function runConsult(){
   const d = now();
   const daysInMonth = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
   const remainDays  = daysInMonth - d.getDate();
-  const fixedRem    = fixedTotal();
+  const fixedRem    = fixedCosts.gas + fixedCosts.tobacco;
   const freeRem     = Math.max(0, totalRem - fixedRem);
-  const monthlyFree = Math.max(0, totalBudget - fixedTotal());
-  const fixedListStr2 = fixedCosts.items.map(it=>`${it.name}¥${fmt(it.amount)}`).join('・');
+  const monthlyFree = Math.max(0, totalBudget - fixedCosts.gas - fixedCosts.tobacco);
 
   const prompt = `あなたは親しみやすい家計アドバイザーです。
 
@@ -1615,7 +1512,7 @@ async function runConsult(){
 
 【現在の財務状況】
 今月の残高：¥${fmt(totalRem)}（残り${remainDays}日）
-固定費（${fixedListStr2}）を除いた今月の自由費残り：¥${fmt(freeRem)}
+固定費（ガソリン・タバコ）を除いた今月の自由費残り：¥${fmt(freeRem)}
 毎月の自由費（固定費除き）：¥${fmt(monthlyFree)}
 貯金口座の残高：¥${fmt(savings)}
 
@@ -1670,50 +1567,323 @@ function addToWishList(){
 function renderWishList(){
   const c = document.getElementById('wish-list-container');
   c.innerHTML = '';
+
+  // 貯金残高バナー
+  const banner = document.createElement('div');
+  banner.style.cssText = 'background:var(--ok-bg);border:1.5px solid #a8d8bc;border-radius:12px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px';
+  banner.innerHTML = `<div style="font-size:11px;font-weight:700;color:var(--ok)">🏦 貯金口座残高</div><div style="font-size:20px;font-weight:900;color:var(--ok)">¥${fmt(savings)}</div>`;
+  c.appendChild(banner);
+
   if(!wishList.length){
-    c.innerHTML = '<div class="empty-msg">欲しいものはまだありません<br>購入相談からリストに追加できます</div>';
+    const empty = document.createElement('div');
+    empty.className = 'empty-msg';
+    empty.innerHTML = '欲しいものはまだありません<br>購入相談からリストに追加できます';
+    c.appendChild(empty);
     return;
   }
   const sorted = [...wishList].sort((a,b)=>{
-    const order = {considering:0, bought:1, 'gave-up':2};
-    return (order[a.status]||0) - (order[b.status]||0);
+    const order = {considering:0, bought:1};
+    return (order[a.status]??0) - (order[b.status]??0);
   });
   sorted.forEach(item => {
     const el = document.createElement('div');
+    const isBought = item.status === 'bought';
     el.className = 'wish-item';
-    const statusMap = {considering:'検討中', bought:'買った', 'gave-up':'諦めた'};
-    const boughtInfo = item.boughtAt ? `　購入日：${item.boughtAt.slice(0,10)}` : '';
-    el.innerHTML = `
-      <div class="wish-item-top">
-        <div class="wish-name">${item.name}</div>
-        <div class="wish-price">¥${fmt(item.price)}</div>
-      </div>
-      <div class="wish-meta">追加日：${item.addedAt.slice(0,10)}${boughtInfo}</div>
-      <div class="wish-status-row">
-        <button class="wish-status-btn ${item.status==='considering'?'active-considering':''}" onclick="setWishStatus('${item.id}','considering')">検討中</button>
-        <button class="wish-status-btn ${item.status==='bought'?'active-bought':''}" onclick="setWishStatus('${item.id}','bought')">買った</button>
-        <button class="wish-status-btn ${item.status==='gave-up'?'active-gave-up':''}" onclick="setWishStatus('${item.id}','gave-up')">諦めた</button>
-        <button class="wish-del-btn" onclick="deleteWish('${item.id}')">×</button>
-      </div>`;
+    if(isBought) el.style.cssText = 'border-color:#a8d8bc;opacity:0.85';
+
+    if(isBought){
+      const actualPrice = item.actualPrice != null ? item.actualPrice : item.price;
+      const actualNote = (item.actualPrice != null && item.actualPrice !== item.price)
+        ? `　実際の購入金額：¥${fmt(item.actualPrice)}` : '';
+      el.innerHTML = `
+        <div style="display:inline-flex;align-items:center;gap:4px;background:var(--ok-bg);color:var(--ok);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;margin-bottom:5px">✓ 買った</div>
+        <div class="wish-item-top">
+          <div class="wish-name" style="color:var(--muted)">${item.name}</div>
+          <div class="wish-price" style="text-decoration:line-through;color:var(--muted)">¥${fmt(item.price)}</div>
+        </div>
+        <div class="wish-meta">購入日：${item.boughtAt||'—'}${actualNote}</div>
+        <div style="display:flex;justify-content:flex-end">
+          <button class="wish-del-btn" onclick="deleteWish('${item.id}')">×</button>
+        </div>`;
+    } else {
+      const canBuy = savings >= item.price;
+      const pct    = item.price > 0 ? Math.min(100, Math.round(savings / item.price * 100)) : 0;
+      const barColor = canBuy ? 'var(--ok)' : pct >= 70 ? 'var(--warn)' : 'var(--border2)';
+      const pctLabel = canBuy
+        ? '<span style="color:var(--ok)">購入可能</span>'
+        : pct >= 70
+          ? `<span style="color:var(--warn)">あと¥${fmt(item.price - savings)}</span>`
+          : `<span style="color:var(--muted)">${pct}%</span>`;
+      const buyBtn = canBuy
+        ? `<button style="flex:1;background:var(--text);color:#fff;border:none;border-radius:9px;padding:10px 0;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer" onclick="openWishBuyDialog('${item.id}')">💳 購入する</button>`
+        : `<button style="flex:1;background:#e6e6e2;color:var(--muted);border:1.5px solid var(--border);border-radius:9px;padding:10px 0;font-size:12px;font-weight:700;font-family:var(--sans)" disabled>あと¥${fmt(item.price - savings)}で購入可能</button>`;
+      el.innerHTML = `
+        <div class="wish-item-top">
+          <div class="wish-name">${item.name}</div>
+          <div class="wish-price">¥${fmt(item.price)}</div>
+        </div>
+        <div class="wish-meta">追加日：${item.addedAt.slice(0,10)}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px">
+          <div style="flex:1;height:6px;background:#e6e6e2;border-radius:3px;overflow:hidden"><div style="height:100%;border-radius:3px;background:${barColor};width:${pct}%"></div></div>
+          <div style="font-size:11px;font-weight:700;flex-shrink:0">${pctLabel}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          ${buyBtn}
+          <button class="wish-del-btn" onclick="deleteWish('${item.id}')">×</button>
+        </div>`;
+    }
     c.appendChild(el);
   });
-}
-
-function setWishStatus(id, status){
-  const idx = wishList.findIndex(w=>w.id===id);
-  if(idx<0) return;
-  wishList[idx].status = status;
-  if(status==='bought' && !wishList[idx].boughtAt){
-    wishList[idx].boughtAt = now().toISOString().slice(0,10);
-  }
-  LS.set(KEY_WISHLIST, wishList);
-  renderWishList();
 }
 function deleteWish(id){
   if(!confirm('この項目を削除しますか？')) return;
   wishList = wishList.filter(w=>w.id!==id);
   LS.set(KEY_WISHLIST, wishList);
   renderWishList();
+}
+
+// ════════════════════════════════
+//  貯金口座モーダル（引き出し・残高修正）
+// ════════════════════════════════
+function openSavingsWithdraw(e){
+  if(e) e.stopPropagation();
+  document.getElementById('savings-modal-title').textContent = '貯金口座から引き出す';
+  document.getElementById('savings-withdraw-form').style.display = 'block';
+  document.getElementById('savings-adjust-form').style.display = 'none';
+  document.getElementById('sw-current').textContent = '¥' + fmt(savings);
+  document.getElementById('sw-amount').value = '';
+  document.getElementById('sw-memo').value = '';
+  document.getElementById('sw-after').textContent = '—';
+  document.getElementById('sw-btn').disabled = true;
+  const overlay = document.getElementById('savings-modal-overlay');
+  overlay.style.display = 'flex';
+}
+
+function openSavingsAdjust(e){
+  if(e) e.stopPropagation();
+  document.getElementById('savings-modal-title').textContent = '残高を修正する';
+  document.getElementById('savings-withdraw-form').style.display = 'none';
+  document.getElementById('savings-adjust-form').style.display = 'block';
+  document.getElementById('sa-current').textContent = '¥' + fmt(savings);
+  document.getElementById('sa-amount').value = '';
+  document.getElementById('sa-diff-row').style.display = 'none';
+  document.getElementById('sa-btn').disabled = true;
+  const overlay = document.getElementById('savings-modal-overlay');
+  overlay.style.display = 'flex';
+}
+
+function closeSavingsModal(e){
+  if(e && e.target !== document.getElementById('savings-modal-overlay')) return;
+  document.getElementById('savings-modal-overlay').style.display = 'none';
+}
+
+function swq(v){
+  document.getElementById('sw-amount').value = v;
+  swCheckBtn();
+}
+
+function swCheckBtn(){
+  const v = parseInt(document.getElementById('sw-amount').value)||0;
+  document.getElementById('sw-btn').disabled = v <= 0;
+  if(v > 0){
+    const after = savings - v;
+    document.getElementById('sw-after').textContent = '¥' + fmt(after);
+    document.getElementById('sw-after').style.color = after < 0 ? 'var(--danger)' : 'var(--text)';
+  } else {
+    document.getElementById('sw-after').textContent = '—';
+  }
+}
+
+function doSavingsWithdraw(){
+  const amount = parseInt(document.getElementById('sw-amount').value)||0;
+  const memo   = document.getElementById('sw-memo').value.trim() || '引き出し';
+  if(amount <= 0) return;
+  if(!confirm(`貯金口座から ¥${fmt(amount)} 引き出しますか？
+
+残高：¥${fmt(savings)} → ¥${fmt(savings - amount)}`)) return;
+
+  savings -= amount;
+  LS.set(KEY_SAVINGS, savings);
+
+  // 貯金引き出し履歴に記録（type:'savings_withdraw'）
+  const d = now();
+  const tx = {
+    id: Date.now().toString(36)+Math.random().toString(36).slice(2),
+    type: 'savings_withdraw',
+    memo,
+    amount,
+    year: d.getFullYear(), month: d.getMonth()+1, day: d.getDate(), ts: d.getTime()
+  };
+  history.push(tx);
+  LS.set(KEY_HISTORY, history);
+
+  document.getElementById('savings-modal-overlay').style.display = 'none';
+  renderHome(); renderHistory(); renderWishList();
+  showToast(`¥${fmt(amount)} 引き出しました（残高 ¥${fmt(savings)}）`);
+}
+
+function saCheckBtn(){
+  const v = parseInt(document.getElementById('sa-amount').value);
+  const diffRow = document.getElementById('sa-diff-row');
+  const diffTxt = document.getElementById('sa-diff-text');
+  if(isNaN(v) || v < 0){
+    diffRow.style.display = 'none';
+    document.getElementById('sa-btn').disabled = true;
+    return;
+  }
+  const diff = v - savings;
+  diffRow.style.display = 'block';
+  if(diff < 0){
+    diffTxt.innerHTML = `差額 <strong style="color:var(--danger)">−¥${fmt(Math.abs(diff))}</strong> が「使途不明金」として記録されます`;
+  } else if(diff > 0){
+    diffTxt.innerHTML = `差額 <strong style="color:var(--ok)">+¥${fmt(diff)}</strong> が「残高調整（増）」として記録されます`;
+  } else {
+    diffTxt.innerHTML = '<span style="color:var(--muted)">差額なし（変更ありません）</span>';
+  }
+  document.getElementById('sa-btn').disabled = (diff === 0);
+}
+
+function doSavingsAdjust(){
+  const newAmt = parseInt(document.getElementById('sa-amount').value);
+  if(isNaN(newAmt) || newAmt < 0) return;
+  const diff = newAmt - savings;
+  if(diff === 0) return;
+
+  const label = diff < 0 ? '使途不明金' : '残高調整（増）';
+  if(!confirm(`貯金残高を ¥${fmt(savings)} → ¥${fmt(newAmt)} に修正します。
+差額 ¥${fmt(Math.abs(diff))} は「${label}」として記録されます。
+
+よろしいですか？`)) return;
+
+  const d = now();
+  const tx = {
+    id: Date.now().toString(36)+Math.random().toString(36).slice(2),
+    type: 'savings_adjust',
+    adjustType: diff < 0 ? 'unknown' : 'increase',
+    memo: label,
+    amount: Math.abs(diff),
+    diff,
+    year: d.getFullYear(), month: d.getMonth()+1, day: d.getDate(), ts: d.getTime()
+  };
+  history.push(tx);
+  LS.set(KEY_HISTORY, history);
+
+  savings = newAmt;
+  LS.set(KEY_SAVINGS, savings);
+
+  document.getElementById('savings-modal-overlay').style.display = 'none';
+  renderHome(); renderHistory();
+  showToast(`残高を ¥${fmt(newAmt)} に修正しました`);
+}
+
+// ════════════════════════════════
+//  欲しいもの購入ダイアログ
+// ════════════════════════════════
+let wishBuyItemId = null;
+
+function openWishBuyDialog(id){
+  const item = wishList.find(w=>w.id===id);
+  if(!item) return;
+  wishBuyItemId = id;
+
+  // ダイアログ要素を動的生成
+  let dlg = document.getElementById('wish-buy-dialog');
+  if(!dlg){
+    dlg = document.createElement('div');
+    dlg.id = 'wish-buy-dialog';
+    dlg.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:300;align-items:center;justify-content:center;padding:20px';
+    dlg.onclick = function(e){ if(e.target===this) closeWishBuyDialog(); };
+    document.body.appendChild(dlg);
+  }
+
+  dlg.innerHTML = `
+    <div style="background:var(--surface);border-radius:16px;padding:20px 18px 16px;width:100%;max-width:420px;box-sizing:border-box" onclick="event.stopPropagation()">
+      <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:5px">${item.name} を購入</div>
+      <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:14px;line-height:1.7">貯金口座から引かれます。おこづかいの集計には含まれません。</div>
+      <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px">実際の購入金額を入力（予算額で入力済み）</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:18px;font-weight:900;color:var(--muted)">¥</span>
+        <input type="number" id="wish-buy-amount" inputmode="numeric"
+          value="${item.price}"
+          style="flex:1;background:#e8f0fe;border:1.5px solid #b5d0f5;border-radius:9px;padding:9px 11px;font-size:22px;font-weight:900;color:var(--text);text-align:right;font-family:var(--sans);outline:none"
+          oninput="updateWishBuyPreview(${item.price})">
+      </div>
+      <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:10px">※ 予算額 ¥${fmt(item.price)} が入力済みです。変更できます</div>
+      <div style="background:var(--bg);border-radius:9px;padding:9px 12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--muted)">現在の残高</div>
+          <div style="font-size:14px;font-weight:900;color:var(--text)">¥${fmt(savings)}</div>
+        </div>
+        <div style="font-size:16px;color:var(--muted)">→</div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--muted)">購入後の残高</div>
+          <div id="wish-buy-after" style="font-size:14px;font-weight:900;color:var(--ok)">¥${fmt(savings - item.price)}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="closeWishBuyDialog()" style="flex:1;background:#f0f0ed;border:1.5px solid var(--border);border-radius:9px;padding:12px;font-size:13px;font-weight:700;color:var(--muted);font-family:var(--sans);cursor:pointer">キャンセル</button>
+        <button onclick="confirmWishBuy()" style="flex:2;background:var(--text);border:none;border-radius:9px;padding:12px;font-size:13px;font-weight:700;color:#fff;font-family:var(--sans);cursor:pointer">購入する</button>
+      </div>
+    </div>`;
+
+  dlg.style.display = 'flex';
+}
+
+function updateWishBuyPreview(budgetPrice){
+  const v = parseInt(document.getElementById('wish-buy-amount').value)||0;
+  const after = savings - v;
+  const el = document.getElementById('wish-buy-after');
+  if(el){
+    el.textContent = '¥' + fmt(after);
+    el.style.color = after < 0 ? 'var(--danger)' : 'var(--ok)';
+  }
+}
+
+function closeWishBuyDialog(){
+  const dlg = document.getElementById('wish-buy-dialog');
+  if(dlg) dlg.style.display = 'none';
+  wishBuyItemId = null;
+}
+
+function confirmWishBuy(){
+  const item = wishList.find(w=>w.id===wishBuyItemId);
+  if(!item) return;
+  const actualPrice = parseInt(document.getElementById('wish-buy-amount').value)||0;
+  if(actualPrice <= 0){ showToast('購入金額を入力してください'); return; }
+  if(actualPrice > savings){
+    if(!confirm(`購入金額（¥${fmt(actualPrice)}）が貯金残高（¥${fmt(savings)}）を超えています。
+残高がマイナスになりますが続けますか？`)) return;
+  }
+
+  // 貯金残高を減算
+  savings -= actualPrice;
+  LS.set(KEY_SAVINGS, savings);
+
+  // 貯金引き出し履歴に記録
+  const d = now();
+  const tx = {
+    id: Date.now().toString(36)+Math.random().toString(36).slice(2),
+    type: 'savings_withdraw',
+    wishItemId: item.id,
+    memo: item.name,
+    amount: actualPrice,
+    year: d.getFullYear(), month: d.getMonth()+1, day: d.getDate(), ts: d.getTime()
+  };
+  history.push(tx);
+  LS.set(KEY_HISTORY, history);
+
+  // 欲しいものリストを「買った」に更新
+  const idx = wishList.findIndex(w=>w.id===wishBuyItemId);
+  if(idx >= 0){
+    wishList[idx].status = 'bought';
+    wishList[idx].boughtAt = d.toISOString().slice(0,10);
+    wishList[idx].actualPrice = actualPrice;
+  }
+  LS.set(KEY_WISHLIST, wishList);
+
+  closeWishBuyDialog();
+  renderHome(); renderHistory(); renderWishList();
+  showToast(`「${item.name}」を購入しました（残高 ¥${fmt(savings)}）`);
 }
 
 // ════════════════════════════════
@@ -1782,37 +1952,61 @@ async function runMonthlyReport(){
   const spendList = sorted.map(([memo,amt])=>`・${memo}：¥${fmt(amt)}`).join('\n');
   const tobaccoSpent = sorted.filter(([m])=>isTobacco(m)).reduce((s,[,v])=>s+v,0);
 
-  // 欲しいものリスト
-  const boughtThisMonth = wishList.filter(w => w.status==='bought' && w.boughtAt && w.boughtAt.startsWith(ym(reportYear,reportMonth)));
+  // 欲しいものリスト — 今月購入分
+  const targetYM = ym(reportYear, reportMonth);
+  const boughtThisMonth = wishList.filter(w => w.status==='bought' && w.boughtAt && w.boughtAt.startsWith(targetYM));
   const wishSection = boughtThisMonth.length
-    ? '\n\n【今月購入したもの】\n' + boughtThisMonth.map(w=>`・${w.name}（¥${fmt(w.price)}）`).join('\n')
+    ? '\n\n【今月貯金から購入したもの】\n' + boughtThisMonth.map(w=>{
+        const actual = w.actualPrice != null ? w.actualPrice : w.price;
+        return `・${w.name}（予算¥${fmt(w.price)}、実際¥${fmt(actual)}）`;
+      }).join('\n')
+    : '';
+
+  // 貯金口座の今月の動き（引き出し・使途不明金）
+  const savingsActivityThisMonth = history.filter(h =>
+    (h.type==='savings_withdraw' || h.type==='savings_adjust') &&
+    ym(h.year, h.month) === targetYM
+  );
+  const savingsWithdrawTotal = savingsActivityThisMonth
+    .filter(h => h.type==='savings_withdraw' && !h.wishItemId)
+    .reduce((s,h) => s+h.amount, 0);
+  const unknownTotal = savingsActivityThisMonth
+    .filter(h => h.type==='savings_adjust' && h.adjustType==='unknown')
+    .reduce((s,h) => s+h.amount, 0);
+
+  let savingsSection = '';
+  if(savingsWithdrawTotal > 0) savingsSection += `\n・理由なし引き出し：¥${fmt(savingsWithdrawTotal)}`;
+  if(unknownTotal > 0) savingsSection += `\n・使途不明金：¥${fmt(unknownTotal)}`;
+  const savingsNote = savingsSection
+    ? `\n\n【貯金口座の今月の動き（集計対象外）】${savingsSection}`
     : '';
 
   const monthlyBudget  = wallets.reduce((s,w)=>s+w.budget,0);
-  const freeTotal      = Math.max(0, monthlyBudget - fixedTotal());
-  const freeSpent      = Math.max(0, total - tobaccoSpent - (fixedCosts.items.filter(it=>!isTobacco(it.name)).reduce((s,it)=>s+it.amount,0)));
-  const fixedListStr3  = fixedCosts.items.map(it=>`${it.name}¥${fmt(it.amount)}`).join('・');
+  const freeTotal      = Math.max(0, monthlyBudget - fixedCosts.gas - fixedCosts.tobacco);
+  const freeSpent      = Math.max(0, total - fixedCosts.gas - tobaccoSpent);
 
   const prompt = `あなたは親しみやすい家計アドバイザーです。成人した子供のおこづかい管理を親子で振り返っています。
 
 【${reportYear}年${reportMonth}月の支出内訳（メモ別）】
 ${spendList}
 合計：¥${fmt(total)}　予算：¥${fmt(monthlyBudget)}
-タバコ代：¥${fmt(tobaccoSpent)}（月の目標¥${fmt(tobaccoLimit())}）
-自由費（固定費${fixedListStr3}を除く）：予算¥${fmt(freeTotal)}　実績¥${fmt(freeSpent)}${wishSection}
+タバコ代：¥${fmt(tobaccoSpent)}（月の目標¥${fmt(fixedCosts.tobacco)}）
+自由費（固定費ガソリン・タバコを除く）：予算¥${fmt(freeTotal)}　実績¥${fmt(freeSpent)}${wishSection}${savingsNote}
 
 【アドバイスの観点】
-・遊興費・外食・趣味などは「自分で調整できる費用」です。固定費（${fixedListStr3}）を払ったうえで残った自由費をどう配分したかを評価してください。
+・遊興費・外食・趣味などは「自分で調整できる費用」です。固定費を払ったうえで残った自由費をどう配分したかを評価してください。
 ・「月の前半に使いすぎず後半まで持たせる」「使いたいものに優先順位をつける」といった自己管理の練習として捉えてコメントしてください。
+・「今月貯金から購入したもの」がある場合は「○○を購入できましたね！」と嬉しそうに言及してください（集計とは無関係です）。
+・「使途不明金」や「理由なし引き出し」がある場合は責めずに事実としてさらっと触れる程度にしてください。
 
 以下の順でコメントしてください。
 1. 全体の評価（自由費の使い方・配分の観点で）
 2. 無駄遣いと思われる項目を具体的に指摘（あれば）
 3. タバコ代の評価（目標より少なければ思いっきり褒める）
-4. 来月の自由費をもっと上手に使うためのアドバイス
-5. 応援の一言
+4. 貯金購入・引き出しへの言及（ある場合のみ）
+5. 来月の自由費をもっと上手に使うためのアドバイス＋応援の一言
 
-文体はやわらかく親しみやすく。450文字以内。`;
+文体はやわらかく親しみやすく。500文字以内。`;
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages',{
