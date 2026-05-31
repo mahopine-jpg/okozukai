@@ -1130,8 +1130,7 @@ function deleteTx(id, e){
 
 function deleteSavingsTx(id, amount, e){
   e.stopPropagation();
-  if(!confirm('この貯金引き出し記録を削除しますか？
-（貯金残高に金額が戻ります）')) return;
+  if(!confirm('この貯金引き出し記録を削除しますか？\n（貯金残高に金額が戻ります）')) return;
   history = history.filter(h=>h.id!==id);
   LS.set(KEY_HISTORY, history);
   savings += amount;
