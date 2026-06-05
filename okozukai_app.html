@@ -1486,6 +1486,7 @@ async function runWeeklyCheck(){
   }
   aiBox.innerHTML = '<div class="ai-loading"><div class="spinner"></div>AIが分析中...</div>';
 
+  try {
   const {mon, sun} = getWeekRange();
   const cym = currentYM();
   const d = now();
@@ -1516,6 +1517,7 @@ async function runWeeklyCheck(){
     ? '\n\n【検討中の欲しいもの】\n' + wishItems.map(w=>`・${w.name}：¥${fmt(w.price)}（${w.plan||'計画未記録'}）`).join('\n')
     : '';
 
+  const fixedItemsTotal = fixedTotal();
   const freeTotal2   = Math.max(0, totalBudget - fixedItemsTotal);
   const totalSpentSoFar = wallets.reduce((s,w)=>s+spentThisMonth(w.name), 0);
   const freeSpentSoFar = Math.max(0, totalSpentSoFar - fixedItemsTotal + tobaccoSpent);
@@ -1544,7 +1546,6 @@ ${tobaccoStatus}
 
 文体はやわらかく親しみやすく。400文字以内。`;
 
-  try {
     const res = await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
@@ -1555,7 +1556,9 @@ ${tobaccoStatus}
     const text = data.content?.find(b=>b.type==='text')?.text||'';
     aiBox.innerHTML = `<div class="ai-box">${text.replace(/\n/g,'<br>')}</div>`;
   } catch(e){
+    console.error('runWeeklyCheck error:', e);
     aiBox.innerHTML = `<div class="ai-box" style="color:var(--danger)">エラー: ${e.message}</div>`;
+    showToast('エラー: ' + e.message);
   }
 }
 
