@@ -594,6 +594,17 @@ body {
     </div>
     <button class="save-btn" id="save-fixed-btn" onclick="saveFixedSettings()" disabled>固定費・連絡先を保存</button>
 
+    <div class="sec-label" style="margin-top:12px">Google スプレッドシート連携</div>
+    <div class="setting-card">
+      <div class="api-row">
+        <div class="api-label">GAS Web App URL</div>
+        <input type="text" class="inp-api" id="inp-gas-url" placeholder="https://script.google.com/macros/s/..." oninput="markGasDirty()" style="font-family:var(--sans);font-size:12px">
+        <div class="api-note">GASをデプロイして発行されたURLを入力してください。設定するとデータがGoogleスプレッドシートにバックグラウンド同期されます。</div>
+        <div id="gas-sync-status" style="font-size:12px;font-weight:700;margin-top:4px;display:none"></div>
+        <button class="save-btn" id="save-gas-btn" style="margin-top:4px" onclick="saveGasUrl()" disabled>URLを保存して同期開始</button>
+      </div>
+    </div>
+
     <div class="sec-label" style="margin-top:12px">Claude API キー</div>
     <div class="setting-card">
       <div class="api-row">
@@ -747,21 +758,86 @@ body {
 
 <script>
 // ════════════════════════════════
-//  Storage helpers
+//  定数・キー
 // ════════════════════════════════
-const LS = {
-  get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch{ return null; } },
-  set: (k,v) => localStorage.setItem(k, JSON.stringify(v)),
-  del: k => localStorage.removeItem(k)
-};
-
 const KEY_WALLETS  = 'wlt_wallets';
 const KEY_HISTORY  = 'wlt_history';
 const KEY_API      = 'wlt_apikey';
 const KEY_SAVINGS  = 'wlt_savings';
 const KEY_SUMMARY  = 'wlt_summary';
 const KEY_WISHLIST = 'wlt_wishlist';
-const KEY_FIXED    = 'wlt_fixed';    // {gas, tobacco, email}
+const KEY_FIXED    = 'wlt_fixed';
+const KEY_GAS_URL  = 'wlt_gas_url';
+
+// ════════════════════════════════
+//  GAS 連携（ハイブリッド同期）
+// ════════════════════════════════
+const GAS = {
+  url: () => { try { return JSON.parse(localStorage.getItem(KEY_GAS_URL)) || ''; } catch{ return ''; } },
+
+  sync: async (key, value) => {
+    const url = GAS.url();
+    if(!url) return;
+    try {
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'save', key, value }),
+      });
+    } catch(e) {
+      console.log('GAS sync error (non-critical):', e.message);
+    }
+  },
+
+  loadAll: async () => {
+    const url = GAS.url();
+    if(!url) return false;
+    try {
+      GAS.setStatus('🔄 スプレッドシートと同期中...', '#888');
+      const res = await fetch(url + '?t=' + Date.now());
+      const json = await res.json();
+      if(!json.ok) throw new Error(json.error);
+      const d = json.data;
+      if(d.wallets)          { wallets          = d.wallets;          localStorage.setItem(KEY_WALLETS,  JSON.stringify(wallets)); }
+      if(d.history)          { history          = d.history;          localStorage.setItem(KEY_HISTORY,  JSON.stringify(history)); }
+      if(d.savings != null)  { savings          = d.savings;          localStorage.setItem(KEY_SAVINGS,  JSON.stringify(savings)); }
+      if(d.monthlySummaries) { monthlySummaries = d.monthlySummaries; localStorage.setItem(KEY_SUMMARY,  JSON.stringify(monthlySummaries)); }
+      if(d.wishList)         { wishList         = d.wishList;         localStorage.setItem(KEY_WISHLIST, JSON.stringify(wishList)); }
+      if(d.fixedCosts)       { fixedCosts       = d.fixedCosts;       localStorage.setItem(KEY_FIXED,    JSON.stringify(fixedCosts)); }
+      GAS.setStatus('✅ 同期完了', 'var(--ok)');
+      setTimeout(() => GAS.setStatus('', ''), 3000);
+      // 画面を再描画
+      renderHome(); renderHistory(); renderSummaryList(); renderSelect(); renderWishList();
+      return true;
+    } catch(e) {
+      GAS.setStatus('⚠ 同期失敗（ローカルデータで起動）', 'var(--warn)');
+      setTimeout(() => GAS.setStatus('', ''), 4000);
+      console.log('GAS loadAll error:', e.message);
+      return false;
+    }
+  },
+
+  setStatus: (msg, color) => {
+    const el = document.getElementById('gas-sync-status');
+    if(!el) return;
+    if(msg) { el.textContent = msg; el.style.color = color; el.style.display = 'block'; }
+    else    { el.style.display = 'none'; }
+  }
+};
+
+// ════════════════════════════════
+//  Storage helpers
+// ════════════════════════════════
+const LS = {
+  get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch{ return null; } },
+  set: (k,v) => {
+    localStorage.setItem(k, JSON.stringify(v));
+    if(k !== KEY_GAS_URL && k !== KEY_API) {
+      GAS.sync(k, v);
+    }
+  },
+  del: k => localStorage.removeItem(k)
+};
 
 // ════════════════════════════════
 //  State
@@ -1207,6 +1283,9 @@ function renderSettings(){
   // APIキー表示
   const stored = LS.get(KEY_API)||'';
   document.getElementById('inp-api').value = stored ? '●'.repeat(20) : '';
+  // GAS URL表示
+  const gasUrl = LS.get(KEY_GAS_URL)||'';
+  document.getElementById('inp-gas-url').value = gasUrl;
 }
 
 let fixedDirty = false;
@@ -2544,6 +2623,31 @@ function markApiDirty(){
 }
 
 // ════════════════════════════════
+//  GAS URL 保存
+// ════════════════════════════════
+let gasDirty = false;
+function markGasDirty(){
+  gasDirty = true;
+  document.getElementById('save-gas-btn').disabled = false;
+}
+
+async function saveGasUrl(){
+  const val = document.getElementById('inp-gas-url').value.trim();
+  localStorage.setItem(KEY_GAS_URL, JSON.stringify(val));
+  gasDirty = false;
+  document.getElementById('save-gas-btn').disabled = true;
+  if(val) {
+    showToast('URLを保存しました。同期中...');
+    const ok = await GAS.loadAll();
+    if(ok) {
+      renderHome(); renderHistory(); renderSummaryList(); renderSelect();
+    }
+  } else {
+    showToast('GAS URLを削除しました');
+  }
+}
+
+// ════════════════════════════════
 //  Init
 // ════════════════════════════════
 renderHome();
@@ -2553,6 +2657,11 @@ updateReportMonthLabel();
 renderSummaryList();
 updateWeekLabel();
 renderWeeklyStats();
+
+// GAS URL が設定済みなら起動時に同期
+if(GAS.url()) {
+  GAS.loadAll();
+}
 </script>
 </body>
 </html>
