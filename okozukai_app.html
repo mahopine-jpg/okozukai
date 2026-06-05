@@ -1490,17 +1490,24 @@ async function runWeeklyCheck(){
   const {mon, sun} = getWeekRange();
   const cym = currentYM();
   const d = now();
-  const daysInMonth = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
-  const remainDays  = daysInMonth - d.getDate();
+  const daysInMonth2 = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  const elapsedDays  = d.getDate();
+  const remainDays   = daysInMonth2 - elapsedDays;
+  const monthPct     = Math.round(elapsedDays / daysInMonth2 * 100);
 
   const weekTx = history.filter(h => {
     if(h.rolledOver||h.type==='transfer') return false;
     const dt = new Date(h.year, h.month-1, h.day);
     return dt >= mon && dt <= sun;
   });
-  const weekSpent   = weekTx.reduce((s,h)=>s+h.amount,0);
-  const totalBudget = wallets.reduce((s,w)=>s+w.budget,0);
-  const totalRem    = totalBudget - wallets.reduce((s,w)=>s+spentThisMonth(w.name),0);
+  const weekSpent    = weekTx.reduce((s,h)=>s+h.amount,0);
+  const totalBudget  = wallets.reduce((s,w)=>s+w.budget,0);
+  const totalSpentSoFar = wallets.reduce((s,w)=>s+spentThisMonth(w.name),0);
+  const totalRem     = totalBudget - totalSpentSoFar;
+  const budgetPct    = totalBudget > 0 ? Math.round(totalSpentSoFar / totalBudget * 100) : 0;
+  const paceJudge    = budgetPct <= monthPct - 10 ? '余裕あり'
+                     : budgetPct <= monthPct + 5  ? 'ほぼ想定通り'
+                     : '使いすぎに注意';
   const tobaccoSpent = history
     .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer'
               && isTobacco(h.memo))
@@ -1518,33 +1525,34 @@ async function runWeeklyCheck(){
     : '';
 
   const fixedItemsTotal = fixedTotal();
-  const freeTotal2   = Math.max(0, totalBudget - fixedItemsTotal);
-  const totalSpentSoFar = wallets.reduce((s,w)=>s+spentThisMonth(w.name), 0);
-  const freeSpentSoFar = Math.max(0, totalSpentSoFar - fixedItemsTotal + tobaccoSpent);
+  const freeTotal   = Math.max(0, totalBudget - fixedItemsTotal);
+  const freeSpentSoFar = Math.max(0, totalSpentSoFar - fixedItemsTotal + Math.max(0, fixedItemsTotal - tobaccoSpent));
+  const fixedListStr = fixedCosts.items.map(it=>`${it.name}¥${fmt(it.amount)}`).join('・');
 
-  const prompt = `あなたは親しみやすい家計アドバイザーです。成人した子供のおこづかい管理を親子で確認しています。
+  // 今週の目立った支出（上位3件）
+  const topSpend = [...weekTx].sort((a,b)=>b.amount-a.amount).slice(0,3)
+    .map(h=>`${h.memo||'（メモなし）'}¥${fmt(h.amount)}`).join('、') || 'なし';
+
+  const prompt = `あなたは家計アドバイザーです。成人男性のおこづかい管理の週次レポートです。
 
 【今週の支出明細】
 ${memoList}
 今週の合計：¥${fmt(weekSpent)}
+今週の目立った支出（上位3件）：${topSpend}
 
-【今月の状況】
+【今月のペース（${elapsedDays}日経過/${daysInMonth2}日、月の${monthPct}%）】
+予算消化率：${budgetPct}%（¥${fmt(totalSpentSoFar)}/¥${fmt(totalBudget)}）→ ${paceJudge}
 残高：¥${fmt(totalRem)}（残り${remainDays}日）
 ${tobaccoStatus}
-自由費（固定費合計¥${fmt(fixedItemsTotal)}を除いた予算）：¥${fmt(freeTotal2)}
-自由費の使用済み：¥${fmt(freeSpentSoFar)}　残り：¥${fmt(Math.max(0,freeTotal2-freeSpentSoFar))}${wishText}
-
-【アドバイスの観点】
-・遊興費は固定費ではなく「自分で調整できる費用」です。月の中で上手に配分できているかを見てあげてください。
-・「今週使いすぎたから来週は抑えよう」という自己調整ができているかを褒めたり、気づかせたりしてください。
+自由費（固定費${fixedListStr}を除いた予算）：¥${fmt(freeTotal)}、使用済み¥${fmt(freeSpentSoFar)}、残り¥${fmt(Math.max(0,freeTotal-freeSpentSoFar))}${wishText}
 
 以下の順でコメントしてください。
-1. 今週の振り返り（自由費の使い方・配分のバランスについて）
-2. タバコ代について（減っていたら思いっきり褒める。多ければ優しく指摘）
-3. 来週の自由費をどう使うかのアドバイス
-4. 応援メッセージ
+1. 今週の注目支出に触れながら全体の振り返り（事実ベースで端的に）
+2. 今月のペース評価（月経過${monthPct}%に対して予算消化${budgetPct}%という数字を使って具体的に）
+3. タバコ代の評価（目標内なら褒める、超えていたら優しく指摘）
+4. 来週・今月残りへの一言アドバイス
 
-文体はやわらかく親しみやすく。400文字以内。`;
+文体はフラットで簡潔に。読んだ瞬間に状況が把握できるよう、数字を積極的に使う。500文字以内。`;
 
     const res = await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
@@ -1569,7 +1577,8 @@ function shareWeeklyMail(){
   const d = now();
   const cym = currentYM();
   const totalBudget = wallets.reduce((s,w)=>s+w.budget,0);
-  const totalRem    = totalBudget - wallets.reduce((s,w)=>s+spentThisMonth(w.name),0);
+  const totalSpentSoFar = wallets.reduce((s,w)=>s+spentThisMonth(w.name),0);
+  const totalRem    = totalBudget - totalSpentSoFar;
   const tobaccoSpent = history
     .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer'
               && isTobacco(h.memo))
@@ -1581,20 +1590,53 @@ function shareWeeklyMail(){
   });
   const weekSpent = weekTx.reduce((s,h)=>s+h.amount,0);
 
+  // 今週の支出明細（日付順）
+  const sortedTx = [...weekTx].sort((a,b)=>{
+    const da = new Date(a.year,a.month-1,a.day), db = new Date(b.year,b.month-1,b.day);
+    return da - db || a.ts - b.ts;
+  });
+  const detailLines = sortedTx.length
+    ? sortedTx.map(h =>
+        `  ${String(h.month).padStart(2,'0')}/${String(h.day).padStart(2,'0')}  ${(h.memo||'（メモなし）').padEnd(10,'　')}  ¥${fmt(h.amount)}`
+      ).join('\n')
+    : '  記帳なし';
+
+  // 今月ペース
+  const daysInMonth3 = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  const elapsedDays3 = d.getDate();
+  const monthPct3    = Math.round(elapsedDays3 / daysInMonth3 * 100);
+  const budgetPct3   = totalBudget > 0 ? Math.round(totalSpentSoFar / totalBudget * 100) : 0;
+  const paceJudge3   = budgetPct3 <= monthPct3 - 10 ? '余裕あり'
+                     : budgetPct3 <= monthPct3 + 5  ? 'ほぼ想定通り'
+                     : '使いすぎに注意';
+  const remainDays3  = daysInMonth3 - elapsedDays3;
+
+  // 欲しいものリスト
   const wishItems = wishList.filter(w=>w.status==='considering');
   const wishSection = wishItems.length
-    ? '\n\n■ 検討中の欲しいもの\n' + wishItems.map(w=>`・${w.name}（¥${fmt(w.price)}）${w.plan||''}`).join('\n')
+    ? '\n■ 欲しいもの（検討中）\n' + wishItems.map(w=>`  ・${w.name}（¥${fmt(w.price)}）`).join('\n')
     : '';
 
   const subject = encodeURIComponent(`おこづかい週次レポート（${fmt2(mon)}〜${fmt2(sun)}）`);
   const body = encodeURIComponent(
 `おこづかい週次レポート ${fmt2(mon)}〜${fmt2(sun)}
+━━━━━━━━━━━━━━━━━━━━
 
-■ 今週の支出：¥${fmt(weekSpent)}
-■ 今月の残高：¥${fmt(totalRem)}
-■ タバコ代（今月）：¥${fmt(tobaccoSpent)} / ¥${fmt(tobaccoLimit())}${wishSection}
+■ 今週の支出明細
+${detailLines}
+  ──────────────────
+  今週合計  ¥${fmt(weekSpent)}
 
-■ AIコメント
+■ 今月のペース（${elapsedDays3}日経過/${daysInMonth3}日中）
+  予算消化：¥${fmt(totalSpentSoFar)} / ¥${fmt(totalBudget)}（${budgetPct3}%）
+  月の経過：${monthPct3}%　→　${paceJudge3}
+  残高：¥${fmt(totalRem)}（残り${remainDays3}日）
+
+■ タバコ代（今月）
+  ¥${fmt(tobaccoSpent)} / ¥${fmt(tobaccoLimit())}（${tobaccoLimit()>0?Math.round(tobaccoSpent/tobaccoLimit()*100):'-'}%消化）
+${wishSection}
+━━━━━━━━━━━━━━━━━━━━
+■ 今週のAIコメント
 ${aiText}
 `);
   const to = encodeURIComponent(fixedCosts.email||'');
