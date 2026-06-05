@@ -1517,6 +1517,7 @@ async function runWeeklyCheck(){
     : '';
 
   const freeTotal2   = Math.max(0, totalBudget - fixedItemsTotal);
+  const totalSpentSoFar = wallets.reduce((s,w)=>s+spentThisMonth(w.name), 0);
   const freeSpentSoFar = Math.max(0, totalSpentSoFar - fixedItemsTotal + tobaccoSpent);
 
   const prompt = `あなたは親しみやすい家計アドバイザーです。成人した子供のおこづかい管理を親子で確認しています。
@@ -1529,7 +1530,7 @@ ${memoList}
 残高：¥${fmt(totalRem)}（残り${remainDays}日）
 ${tobaccoStatus}
 自由費（固定費合計¥${fmt(fixedItemsTotal)}を除いた予算）：¥${fmt(freeTotal2)}
-自由費の使用済み：¥${fmt(freeSpentSoFar)}　残り：¥${fmt(Math.max(0,freeTotal-freeSpentSoFar))}${wishText}
+自由費の使用済み：¥${fmt(freeSpentSoFar)}　残り：¥${fmt(Math.max(0,freeTotal2-freeSpentSoFar))}${wishText}
 
 【アドバイスの観点】
 ・遊興費は固定費ではなく「自分で調整できる費用」です。月の中で上手に配分できているかを見てあげてください。
