@@ -102,6 +102,46 @@ body {
 .card-remaining.danger { color: var(--danger); }
 .card-budget { font-size: 14px; font-weight: 700; color: var(--muted); }
 
+/* ── History Filter ── */
+.filter-bar { padding: 0 12px; margin-bottom: 10px; }
+.filter-toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 12px; padding: 11px 15px; cursor: pointer;
+  font-size: 14px; font-weight: 700; color: var(--muted); width: 100%;
+  font-family: var(--sans); transition: border-color .15s;
+}
+.filter-toggle.active { border-color: var(--text); color: var(--text); }
+.filter-toggle .ft-arrow { transition: transform .2s; font-size: 12px; }
+.filter-toggle.open .ft-arrow { transform: rotate(180deg); }
+.filter-badge {
+  display: inline-block; background: var(--text); color: var(--surface);
+  border-radius: 10px; font-size: 11px; font-weight: 900;
+  padding: 1px 7px; margin-left: 6px;
+}
+.filter-panel {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-top: none; border-radius: 0 0 12px 12px;
+  padding: 12px 15px 14px; margin-top: -8px;
+  display: none; animation: fadeUp .15s ease;
+}
+.filter-panel.open { display: block; }
+.filter-toggle.open { border-radius: 12px 12px 0 0; }
+.filter-field { margin-bottom: 10px; }
+.filter-field:last-child { margin-bottom: 0; }
+.filter-label { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 5px; }
+.filter-input {
+  width: 100%; background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 10px; color: var(--text); font-family: var(--sans);
+  font-size: 15px; font-weight: 700; padding: 10px 12px;
+  outline: none; box-sizing: border-box; -webkit-appearance: none; appearance: none;
+}
+.filter-input:focus { border-color: var(--text); }
+.filter-clear {
+  background: none; border: none; color: var(--muted); font-family: var(--sans);
+  font-size: 13px; font-weight: 700; cursor: pointer; padding: 4px 0; text-decoration: underline;
+}
+
 /* ── History ── */
 .history-list { padding: 0 12px; }
 .h-item {
@@ -129,6 +169,9 @@ body {
 .h-tag-transfer { background: #e8f0fe; color: #1a4a8a; }
 .h-tag-savings { background: #e1f0e8; color: #1a7a4a; }
 .h-tag-savings-buy { background: #e1f0e8; color: #1a7a4a; }
+.h-tag-income { background: #fff3d6; color: #9a6a00; }
+.h-tag-cat { background: var(--bg); color: var(--muted); border: 1px solid var(--border); margin-left: 4px; }
+.h-tag-cat-fixed { background: #f0ebe1; color: #8a6d3b; border-color: #e0d4bd; }
 .h-tag-savings-adj-up { background: #e6f4ec; color: #1a7a4a; }
 .h-amount-in { font-size: 18px; font-weight: 900; color: var(--ok); }
 
@@ -463,6 +506,27 @@ body {
 <!-- ════ HISTORY ════ -->
 <div class="page" id="page-history">
   <div class="sec-label">記帳履歴</div>
+  <div class="filter-bar">
+    <button class="filter-toggle" id="filter-toggle" onclick="toggleFilterPanel()">
+      <span>絞り込み<span class="filter-badge" id="filter-badge" style="display:none">0</span></span>
+      <span class="ft-arrow">▼</span>
+    </button>
+    <div class="filter-panel" id="filter-panel">
+      <div class="filter-field">
+        <div class="filter-label">月</div>
+        <select class="filter-input" id="filter-month" onchange="renderHistory()"></select>
+      </div>
+      <div class="filter-field">
+        <div class="filter-label">口座</div>
+        <select class="filter-input" id="filter-wallet" onchange="renderHistory()"></select>
+      </div>
+      <div class="filter-field">
+        <div class="filter-label">メモ検索</div>
+        <input type="text" class="filter-input" id="filter-memo" placeholder="キーワード" oninput="renderHistory()">
+      </div>
+      <button class="filter-clear" onclick="clearFilters()">条件をクリア</button>
+    </div>
+  </div>
   <div class="history-list" id="history-list"></div>
 </div>
 
@@ -647,6 +711,7 @@ body {
   <!-- タブ切り替え -->
   <div class="panel-tab-row">
     <div class="panel-tab active" id="tab-expense" onclick="switchPanelTab('expense')">支出</div>
+    <div class="panel-tab" id="tab-income" onclick="switchPanelTab('income')">収入</div>
     <div class="panel-tab" id="tab-transfer" onclick="switchPanelTab('transfer')">口座移動</div>
   </div>
 
@@ -662,21 +727,30 @@ body {
     <div id="receipt-loading" style="display:none;text-align:center;padding:10px 0">
       <div class="ai-loading" style="justify-content:center"><div class="spinner"></div>レシートを読み取り中...</div>
     </div>
-    <div class="quick-row">
-      <button class="q-btn" onclick="qa(500)">¥500</button>
-      <button class="q-btn" onclick="qa(1000)">¥1,000</button>
-      <button class="q-btn" onclick="qa(2000)">¥2,000</button>
-      <button class="q-btn" onclick="qa(3000)">¥3,000</button>
-      <button class="q-btn" onclick="qa(5000)">¥5,000</button>
-      <button class="q-btn" onclick="qa(10000)">¥10,000</button>
-    </div>
     <div class="field-row" style="align-items:center">
       <span class="yen" style="flex-shrink:0">¥</span>
       <input type="number" class="inp-amount" id="inp-amount" placeholder="0" inputmode="numeric" oninput="checkAddBtn()" style="flex:1;min-width:0;width:100%">
     </div>
-    <input type="text" class="inp-memo" id="inp-memo" placeholder="メモ（任意）">
+    <div class="field-row">
+      <select class="inp-select" id="inp-category" onchange="checkAddBtn()"></select>
+    </div>
+    <input type="text" class="inp-memo" id="inp-memo" placeholder="内容（必須）" oninput="checkAddBtn()">
     <input type="date" class="inp-memo" id="inp-date" style="margin-bottom:10px">
     <button class="add-btn" id="add-tx-btn" onclick="addTx()" disabled>記帳する</button>
+  </div>
+
+  <!-- 収入フォーム -->
+  <div id="income-form" style="display:none">
+    <div class="field-row">
+      <select class="inp-select" id="income-wallet"></select>
+    </div>
+    <div class="field-row" style="align-items:center">
+      <span class="yen" style="flex-shrink:0">¥</span>
+      <input type="number" class="inp-amount" id="income-amount" placeholder="0" inputmode="numeric" oninput="checkIncomeBtn()" style="flex:1;min-width:0;width:100%">
+    </div>
+    <input type="text" class="inp-memo" id="income-memo" placeholder="内容（必須・例：お小遣い、臨時収入）" oninput="checkIncomeBtn()">
+    <input type="date" class="inp-memo" id="income-date" style="margin-bottom:10px">
+    <button class="add-btn" id="add-income-btn" onclick="addIncome()" disabled>収入を記帳する</button>
   </div>
 
   <!-- 口座移動フォーム -->
@@ -686,19 +760,11 @@ body {
       <span class="transfer-arrow">→</span>
       <select class="inp-select" id="transfer-to"></select>
     </div>
-    <div class="quick-row">
-      <button class="q-btn" onclick="qt(500)">¥500</button>
-      <button class="q-btn" onclick="qt(1000)">¥1,000</button>
-      <button class="q-btn" onclick="qt(2000)">¥2,000</button>
-      <button class="q-btn" onclick="qt(3000)">¥3,000</button>
-      <button class="q-btn" onclick="qt(5000)">¥5,000</button>
-      <button class="q-btn" onclick="qt(10000)">¥10,000</button>
-    </div>
     <div class="field-row" style="align-items:center">
       <span class="yen" style="flex-shrink:0">¥</span>
       <input type="number" class="inp-amount" id="transfer-amount" placeholder="0" inputmode="numeric" oninput="checkTransferBtn()" style="flex:1;min-width:0;width:100%">
     </div>
-    <input type="text" class="inp-memo" id="transfer-memo" placeholder="メモ（任意・例：PayPayにチャージ）">
+    <input type="text" class="inp-memo" id="transfer-memo" placeholder="内容（必須・例：PayPayにチャージ）" oninput="checkTransferBtn()">
     <input type="date" class="inp-memo" id="transfer-date" style="margin-bottom:10px">
     <button class="add-btn" id="add-transfer-btn" onclick="addTransfer()" disabled>移動する</button>
   </div>
@@ -798,18 +864,39 @@ function loadFixedCosts(){
 }
 let fixedCosts = loadFixedCosts();
 
+// ── カテゴリ ──
+// 変動費カテゴリ（固定） + 固定費カテゴリ（固定費設定の項目名から動的生成）
+const VARIABLE_CATEGORIES = ['食費', '日用品', '趣味・娯楽', '交際費', '雑費'];
+// 固定費カテゴリ名の一覧（fixedCosts.items の name）
+function fixedCategoryNames(){ return fixedCosts.items.map(it => it.name); }
+// 全カテゴリ（変動費 + 固定費）
+function allCategories(){ return [...VARIABLE_CATEGORIES, ...fixedCategoryNames()]; }
+// 指定カテゴリが固定費カテゴリかどうか
+function isFixedCategory(cat){ return fixedCategoryNames().includes(cat); }
+// カテゴリ選択肢を <select> に流し込む（現在値をできるだけ維持）
+function populateCategorySelect(){
+  const sel = document.getElementById('inp-category');
+  if(!sel) return;
+  const prev = sel.value;
+  const cats = allCategories();
+  sel.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+  if(cats.includes(prev)) sel.value = prev;
+}
+
 // 固定費合計を返すヘルパー
 function fixedTotal(){ return fixedCosts.items.reduce((s,it)=>s+it.amount,0); }
 // タバコ上限（itemsの中からタバコ代を探す）
 function tobaccoLimit(){ const t=fixedCosts.items.find(it=>isTobacco(it.name)); return t?t.amount:0; }
 
 // 固定費として実際に使った金額を返すヘルパー（対象年月、省略時は今月）
-// 固定費リストの項目名がメモに含まれる記帳を固定費支出とみなす
+// カテゴリが固定費カテゴリの記帳を固定費支出とみなす（旧データはメモ照合でフォールバック）
 function fixedSpentInMonth(y, m){
   const target = ym(y, m);
   return history.filter(h => {
     if(ym(h.year, h.month) !== target) return false;
-    if(h.rolledOver || h.type === 'transfer') return false;
+    if(h.rolledOver || h.type === 'transfer' || h.type === 'income') return false;
+    if(h.category) return isFixedCategory(h.category);
+    // 旧データ（categoryなし）はメモ照合でフォールバック
     return fixedCosts.items.some(it => h.memo && h.memo.includes(it.name));
   }).reduce((s,h) => s + h.amount, 0);
 }
@@ -846,6 +933,7 @@ function spentThisMonth(walletName){
     .filter(h => h.walletName === walletName && ym(h.year,h.month) === cym && !h.rolledOver)
     .reduce((s,h) => {
       if(h.type==='transfer' && h.transferDir==='in') return s - h.amount;
+      if(h.type==='income') return s - h.amount;
       return s + h.amount;
     }, 0);
 }
@@ -858,6 +946,7 @@ function spentInMonth(walletName, y, m){
     .filter(h => h.walletName === walletName && ym(h.year,h.month) === target && (isCurrentMonth ? !h.rolledOver : true))
     .reduce((s,h) => {
       if(h.type==='transfer' && h.transferDir==='in') return s - h.amount;
+      if(h.type==='income') return s - h.amount;
       return s + h.amount;
     }, 0);
 }
@@ -930,6 +1019,53 @@ function renderHome(){
 // ════════════════════════════════
 //  Render History
 // ════════════════════════════════
+function toggleFilterPanel(){
+  document.getElementById('filter-panel').classList.toggle('open');
+  document.getElementById('filter-toggle').classList.toggle('open');
+}
+function populateFilterOptions(){
+  // 月の選択肢（履歴に存在する年月を新しい順で）
+  const monthSel = document.getElementById('filter-month');
+  const walletSel = document.getElementById('filter-wallet');
+  if(!monthSel || !walletSel) return;
+  const prevM = monthSel.value, prevW = walletSel.value;
+
+  const months = [...new Set(history.map(h => ym(h.year,h.month)))].sort().reverse();
+  monthSel.innerHTML = '<option value="">すべての月</option>' +
+    months.map(m => {
+      const [y,mo] = m.split('-');
+      return `<option value="${m}">${y}年${Number(mo)}月</option>`;
+    }).join('');
+  monthSel.value = months.includes(prevM) ? prevM : '';
+
+  const names = [...new Set(history.map(h => h.walletName).filter(Boolean))];
+  walletSel.innerHTML = '<option value="">すべての口座</option>' +
+    names.map(n => `<option value="${n}">${n}</option>`).join('');
+  walletSel.value = names.includes(prevW) ? prevW : '';
+}
+function updateFilterBadge(fMonth, fWallet, fMemo){
+  const count = [fMonth, fWallet, fMemo].filter(Boolean).length;
+  const badge = document.getElementById('filter-badge');
+  const toggle = document.getElementById('filter-toggle');
+  if(!badge) return;
+  if(count){
+    badge.textContent = count;
+    badge.style.display = 'inline-block';
+    toggle.classList.add('active');
+  } else {
+    badge.style.display = 'none';
+    toggle.classList.remove('active');
+  }
+}
+function clearFilters(){
+  const m = document.getElementById('filter-month');
+  const w = document.getElementById('filter-wallet');
+  const me = document.getElementById('filter-memo');
+  if(m) m.value = '';
+  if(w) w.value = '';
+  if(me) me.value = '';
+  renderHistory();
+}
 function renderHistory(){
   const c = document.getElementById('history-list');
   c.innerHTML = '';
@@ -937,7 +1073,29 @@ function renderHistory(){
     c.innerHTML = '<div class="empty-msg">記帳はまだありません</div>';
     return;
   }
-  const sorted = [...history].sort((a,b)=>{
+
+  // フィルター条件
+  const fMonth  = (document.getElementById('filter-month')||{}).value  || '';
+  const fWallet = (document.getElementById('filter-wallet')||{}).value || '';
+  const fMemo   = ((document.getElementById('filter-memo')||{}).value  || '').trim().toLowerCase();
+  updateFilterBadge(fMonth, fWallet, fMemo);
+
+  let list = history.filter(h => {
+    if(fMonth && ym(h.year,h.month) !== fMonth) return false;
+    if(fWallet && h.walletName !== fWallet) return false;
+    if(fMemo){
+      const text = ((h.memo||'') + ' ' + (h.walletName||'')).toLowerCase();
+      if(!text.includes(fMemo)) return false;
+    }
+    return true;
+  });
+
+  if(!list.length){
+    c.innerHTML = '<div class="empty-msg">該当する記帳がありません</div>';
+    return;
+  }
+
+  const sorted = [...list].sort((a,b)=>{
     const da = new Date(a.year, a.month-1, a.day);
     const db = new Date(b.year, b.month-1, b.day);
     return db - da || b.ts - a.ts;
@@ -947,6 +1105,7 @@ function renderHistory(){
     d.className = 'h-item';
     const dateStr = `${String(h.month).padStart(2,'0')}/${String(h.day).padStart(2,'0')}`;
     const isTransfer    = h.type === 'transfer';
+    const isIncome      = h.type === 'income';
     const isSavingsW    = h.type === 'savings_withdraw';
     const isSavingsAdj  = h.type === 'savings_adjust';
     const isIn = isTransfer && h.transferDir === 'in';
@@ -958,6 +1117,12 @@ function renderHistory(){
         ? `<div class="h-amount-in">+¥${fmt(h.amount)}</div>`
         : `<div class="h-amount">−¥${fmt(h.amount)}</div>`;
       delBtn = isIn ? '' : `<button class="h-del" onclick="deleteTransfer('${h.id}',event)" title="削除">×</button>`;
+    } else if(isIncome){
+      tagLabel = `💰 収入 → ${h.walletName}`;
+      tagClass = 'h-tag h-tag-income';
+      amountHtml = `<div class="h-amount-in">+¥${fmt(h.amount)}</div>`;
+      delBtn = `<button class="h-del" onclick="editIncome('${h.id}',event)" title="編集">✎</button>
+                <button class="h-del" onclick="deleteIncome('${h.id}',event)" title="削除">×</button>`;
     } else if(isSavingsW){
       tagLabel = '🏦 貯金引き出し';
       tagClass = 'h-tag' + (h.wishItemId ? ' h-tag-savings-buy' : ' h-tag-savings');
@@ -978,9 +1143,11 @@ function renderHistory(){
       delBtn = `<button class="h-del" onclick="editTx('${h.id}',event)" title="編集">✎</button>
                 <button class="h-del" onclick="deleteTx('${h.id}',event)" title="削除">×</button>`;
     }
+    const catTag = (!isTransfer && !isIncome && !isSavingsW && !isSavingsAdj && h.category)
+      ? `<span class="h-tag h-tag-cat${isFixedCategory(h.category)?' h-tag-cat-fixed':''}">${h.category}</span>` : '';
     d.innerHTML = `
       <div class="h-left">
-        <span class="${tagClass}">${tagLabel}</span>
+        <span class="${tagClass}">${tagLabel}</span>${catTag}
         <div class="h-memo">${h.memo||h.walletName}</div>
       </div>
       <div class="h-right">
@@ -1001,15 +1168,11 @@ function renderSelect(){
   const opts = wallets.map((w,i)=>`<option value="${i}">${w.name}</option>`).join('');
   document.getElementById('wallet-select').innerHTML = opts;
   document.getElementById('transfer-from').innerHTML = opts;
+  document.getElementById('income-wallet').innerHTML = opts;
+  populateCategorySelect();
   // 移動先は2番目の口座をデフォルト選択
   const toOpts = wallets.map((w,i)=>`<option value="${i}"${i===1?' selected':''}>${w.name}</option>`).join('');
   document.getElementById('transfer-to').innerHTML = toOpts;
-}
-
-function qa(v){
-  document.getElementById('inp-amount').value=v;
-  document.getElementById('inp-amount').focus();
-  checkAddBtn();
 }
 
 // ────────────────────────────────
@@ -1018,24 +1181,73 @@ function qa(v){
 let currentPanelTab = 'expense';
 function switchPanelTab(tab){
   currentPanelTab = tab;
-  document.getElementById('expense-form').style.display = tab==='expense' ? 'block' : 'none';
+  document.getElementById('expense-form').style.display  = tab==='expense'  ? 'block' : 'none';
+  document.getElementById('income-form').style.display   = tab==='income'   ? 'block' : 'none';
   document.getElementById('transfer-form').style.display = tab==='transfer' ? 'block' : 'none';
   document.getElementById('tab-expense').classList.toggle('active', tab==='expense');
+  document.getElementById('tab-income').classList.toggle('active', tab==='income');
   document.getElementById('tab-transfer').classList.toggle('active', tab==='transfer');
-  document.querySelector('.panel-title').textContent = tab==='expense' ? '記帳する' : '口座移動';
+  const titles = { expense:'記帳する', income:'収入を記帳', transfer:'口座移動' };
+  document.querySelector('.panel-title').textContent = titles[tab] || '記帳する';
+}
+
+// ────────────────────────────────
+//  Income helpers
+// ────────────────────────────────
+function checkIncomeBtn(){
+  const v = parseInt(document.getElementById('income-amount').value)||0;
+  const memo = document.getElementById('income-memo').value.trim();
+  document.getElementById('add-income-btn').disabled = (v <= 0 || !memo);
+}
+function addIncome(){
+  const wIdx    = parseInt(document.getElementById('income-wallet').value);
+  const amount  = parseInt(document.getElementById('income-amount').value)||0;
+  const memo    = document.getElementById('income-memo').value.trim();
+  const dateVal = document.getElementById('income-date').value;
+  if(amount<=0){ document.getElementById('income-amount').focus(); return; }
+  if(!memo){ document.getElementById('income-memo').focus(); return; }
+  if(!wallets[wIdx]) return;
+
+  const d = dateVal ? new Date(dateVal+'T00:00:00') : now();
+
+  if(editingIncomeId){
+    const tx = history.find(h=>h.id===editingIncomeId);
+    if(tx){
+      tx.walletName = wallets[wIdx].name;
+      tx.amount = amount;
+      tx.memo = memo;
+      tx.year = d.getFullYear(); tx.month = d.getMonth()+1; tx.day = d.getDate(); tx.ts = d.getTime();
+    }
+    editingIncomeId = null;
+    LS.set(KEY_HISTORY, history);
+    renderHome(); renderHistory();
+    closePanel();
+    showToast('収入を修正しました');
+    return;
+  }
+
+  const tx = {
+    id: Date.now().toString(36)+Math.random().toString(36).slice(2),
+    type:'income',
+    walletName: wallets[wIdx].name,
+    memo: memo,
+    amount,
+    year: d.getFullYear(), month: d.getMonth()+1, day: d.getDate(), ts: d.getTime()
+  };
+  history.push(tx);
+  LS.set(KEY_HISTORY, history);
+  renderHome(); renderHistory();
+  closePanel();
+  showToast(`${wallets[wIdx].name} に ¥${fmt(amount)} 収入を記帳しました`);
 }
 
 // ────────────────────────────────
 //  Transfer helpers
 // ────────────────────────────────
-function qt(v){
-  document.getElementById('transfer-amount').value=v;
-  document.getElementById('transfer-amount').focus();
-  checkTransferBtn();
-}
 function checkTransferBtn(){
   const v = parseInt(document.getElementById('transfer-amount').value)||0;
-  document.getElementById('add-transfer-btn').disabled = v <= 0;
+  const memo = document.getElementById('transfer-memo').value.trim();
+  document.getElementById('add-transfer-btn').disabled = (v <= 0 || !memo);
 }
 
 function addTransfer(){
@@ -1045,6 +1257,7 @@ function addTransfer(){
   const memo     = document.getElementById('transfer-memo').value.trim();
   const dateVal  = document.getElementById('transfer-date').value;
   if(amount<=0){ document.getElementById('transfer-amount').focus(); return; }
+  if(!memo){ document.getElementById('transfer-memo').focus(); return; }
   if(fromIdx===toIdx){ showToast('移動元と移動先が同じです'); return; }
   if(!wallets[fromIdx]||!wallets[toIdx]) return;
 
@@ -1052,20 +1265,19 @@ function addTransfer(){
   const pairId = Date.now().toString(36)+Math.random().toString(36).slice(2);
   const outId  = pairId+'_out';
   const inId   = pairId+'_in';
-  const defaultMemo = memo || `${wallets[fromIdx].name}→${wallets[toIdx].name}`;
 
   const txOut = {
     id: outId, type:'transfer', transferDir:'out',
     transferPairId: pairId, transferPeerName: wallets[toIdx].name,
     walletName: wallets[fromIdx].name,
-    memo: defaultMemo, amount,
+    memo: memo, amount,
     year: d.getFullYear(), month: d.getMonth()+1, day: d.getDate(), ts: d.getTime()
   };
   const txIn = {
     id: inId, type:'transfer', transferDir:'in',
     transferPairId: pairId, transferPeerName: wallets[fromIdx].name,
     walletName: wallets[toIdx].name,
-    memo: defaultMemo, amount,
+    memo: memo, amount,
     year: d.getFullYear(), month: d.getMonth()+1, day: d.getDate(), ts: d.getTime()
   };
   history.push(txOut, txIn);
@@ -1091,8 +1303,10 @@ function addTx(){
   const idx    = parseInt(document.getElementById('wallet-select').value);
   const amount = parseInt(document.getElementById('inp-amount').value)||0;
   const memo   = document.getElementById('inp-memo').value.trim();
+  const category = document.getElementById('inp-category').value;
   const dateVal= document.getElementById('inp-date').value;
   if(amount<=0){ document.getElementById('inp-amount').focus(); return; }
+  if(!memo){ document.getElementById('inp-memo').focus(); return; }
   if(!wallets[idx]){ return; }
 
   const d = dateVal ? new Date(dateVal+'T00:00:00') : now();
@@ -1104,7 +1318,8 @@ function addTx(){
       history[idx2] = {
         ...history[idx2],
         walletName: wallets[idx].name,
-        memo: memo || wallets[idx].name,
+        memo: memo,
+        category,
         amount,
         year:  d.getFullYear(),
         month: d.getMonth()+1,
@@ -1118,7 +1333,8 @@ function addTx(){
     const tx = {
       id: Date.now().toString(36)+Math.random().toString(36).slice(2),
       walletName: wallets[idx].name,
-      memo: memo || wallets[idx].name,
+      memo: memo,
+      category,
       amount,
       year:  d.getFullYear(),
       month: d.getMonth()+1,
@@ -1146,6 +1362,10 @@ function editTx(id, e){
   // 値をセット
   document.getElementById('inp-amount').value = tx.amount;
   document.getElementById('inp-memo').value   = tx.memo;
+  populateCategorySelect();
+  if(tx.category && allCategories().includes(tx.category)){
+    document.getElementById('inp-category').value = tx.category;
+  }
   const yyyy = tx.year;
   const mm   = String(tx.month).padStart(2,'0');
   const dd   = String(tx.day).padStart(2,'0');
@@ -1182,6 +1402,36 @@ function deleteSavingsTx(id, amount, e){
   LS.set(KEY_SAVINGS, savings);
   renderHistory(); renderHome(); renderWishList();
   showToast('削除しました（残高を戻しました）');
+}
+
+let editingIncomeId = null;
+function editIncome(id, e){
+  e.stopPropagation();
+  const tx = history.find(h=>h.id===id);
+  if(!tx) return;
+  editingIncomeId = id;
+  openPanel();
+  switchPanelTab('income');
+  const wIdx = wallets.findIndex(w=>w.name===tx.walletName);
+  if(wIdx>=0) document.getElementById('income-wallet').value = wIdx;
+  document.getElementById('income-amount').value = tx.amount;
+  document.getElementById('income-memo').value   = tx.memo || '';
+  const yyyy = tx.year, mm = String(tx.month).padStart(2,'0'), dd = String(tx.day).padStart(2,'0');
+  document.getElementById('income-date').value = `${yyyy}-${mm}-${dd}`;
+  document.querySelector('.panel-title').textContent = '収入を修正する';
+  document.getElementById('add-income-btn').textContent = '修正を保存する';
+  document.getElementById('add-income-btn').disabled = false;
+  panelOpen = true;
+  document.getElementById('add-panel').classList.remove('hidden');
+}
+
+function deleteIncome(id, e){
+  e.stopPropagation();
+  if(!confirm('この収入記録を削除しますか？')) return;
+  history = history.filter(h=>h.id!==id);
+  LS.set(KEY_HISTORY, history);
+  renderHistory(); renderHome();
+  showToast('削除しました');
 }
 
 // ════════════════════════════════
@@ -1240,6 +1490,7 @@ function saveFixedSettings(){
   LS.set(KEY_FIXED, fixedCosts);
   fixedDirty = false;
   document.getElementById('save-fixed-btn').disabled = true;
+  populateCategorySelect();
   showToast('✓ 固定費・連絡先を保存しました');
 }
 
@@ -1442,7 +1693,7 @@ function renderWeeklyStats(){
   // 今週の支出（移動のoutは除外、支出のみ）
   const weekTx = history.filter(h => {
     if(h.rolledOver) return false;
-    if(h.type==='transfer') return false;
+    if(h.type==='transfer'||h.type==='income') return false;
     const d = new Date(h.year, h.month-1, h.day);
     return d >= mon && d <= sun;
   });
@@ -1450,12 +1701,12 @@ function renderWeeklyStats(){
 
   // 今月の支出合計
   const monthSpent = history
-    .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer')
+    .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer' && h.type!=='income')
     .reduce((s,h)=>s+h.amount,0);
 
   // 今月のタバコ代
   const tobaccoSpent = history
-    .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer'
+    .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer' && h.type!=='income'
               && isTobacco(h.memo))
     .reduce((s,h)=>s+h.amount,0);
 
@@ -1505,7 +1756,7 @@ async function runWeeklyCheck(){
   const monthPct     = Math.round(elapsedDays / daysInMonth2 * 100);
 
   const weekTx = history.filter(h => {
-    if(h.rolledOver||h.type==='transfer') return false;
+    if(h.rolledOver||h.type==='transfer'||h.type==='income') return false;
     const dt = new Date(h.year, h.month-1, h.day);
     return dt >= mon && dt <= sun;
   });
@@ -1518,7 +1769,7 @@ async function runWeeklyCheck(){
                      : budgetPct <= monthPct + 5  ? 'ほぼ想定通り'
                      : '使いすぎに注意';
   const tobaccoSpent = history
-    .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer'
+    .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer' && h.type!=='income'
               && isTobacco(h.memo))
     .reduce((s,h)=>s+h.amount,0);
 
@@ -1590,11 +1841,11 @@ function shareWeeklyMail(){
   const totalSpentSoFar = wallets.reduce((s,w)=>s+spentThisMonth(w.name),0);
   const totalRem    = totalBudget - totalSpentSoFar;
   const tobaccoSpent = history
-    .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer'
+    .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer' && h.type!=='income'
               && isTobacco(h.memo))
     .reduce((s,h)=>s+h.amount,0);
   const weekTx = history.filter(h => {
-    if(h.rolledOver||h.type==='transfer') return false;
+    if(h.rolledOver||h.type==='transfer'||h.type==='income') return false;
     const dt = new Date(h.year, h.month-1, h.day);
     return dt >= mon && dt <= sun;
   });
@@ -2084,7 +2335,7 @@ async function runMonthlyReport(){
   const btn = document.getElementById('report-btn');
   btn.disabled = true;
   const target = ym(reportYear, reportMonth);
-  const monthHistory = history.filter(h => ym(h.year,h.month)===target && h.type!=='transfer');
+  const monthHistory = history.filter(h => ym(h.year,h.month)===target && h.type!=='transfer' && h.type!=='income');
   document.getElementById('report-output').style.display = 'block';
 
   // メモ別集計
@@ -2096,15 +2347,18 @@ async function runMonthlyReport(){
     btn.disabled = false; return;
   }
 
-  // メモをキーに集計
+  // カテゴリをキーに集計（旧データはメモから推定）
   const memoMap = {};
-  const normalizeKey = memo => {
-    if(!memo) return '（メモなし）';
-    if(isTobacco(memo)) return 'タバコ';
-    return memo;
+  const normalizeKey = h => {
+    if(h.category) return h.category;
+    if(isTobacco(h.memo)) return 'たばこ';
+    // 固定費名がメモに含まれればそのカテゴリ扱い
+    const fc = (fixedCosts.items||[]).find(it => h.memo && it.name && h.memo.includes(it.name));
+    if(fc) return fc.name;
+    return h.memo || '（内容なし）';
   };
   monthHistory.forEach(h => {
-    const key = normalizeKey(h.memo);
+    const key = normalizeKey(h);
     memoMap[key] = (memoMap[key]||0) + h.amount;
   });
   const total = Object.values(memoMap).reduce((s,v)=>s+v,0);
@@ -2337,6 +2591,7 @@ function openPanel(){
   const todayStr = `${yyyy}-${mm}-${dd}`;
   document.getElementById('inp-date').value = todayStr;
   document.getElementById('transfer-date').value = todayStr;
+  if(!editingIncomeId) document.getElementById('income-date').value = todayStr;
   document.getElementById('add-panel').classList.remove('hidden');
   // APIキーがある場合のみレシートボタンを表示
   const apiKey = LS.get(KEY_API);
@@ -2349,6 +2604,7 @@ function closePanel(){
   document.getElementById('inp-amount').value='';
   document.getElementById('inp-memo').value='';
   document.getElementById('inp-date').value='';
+  { const cs=document.getElementById('inp-category'); if(cs) cs.selectedIndex=0; }
   document.getElementById('add-tx-btn').disabled=true;
   document.getElementById('receipt-loading').style.display='none';
   document.getElementById('receipt-btn-wrap').style.display='none';
@@ -2358,6 +2614,13 @@ function closePanel(){
   document.getElementById('transfer-memo').value='';
   document.getElementById('transfer-date').value='';
   document.getElementById('add-transfer-btn').disabled=true;
+  // 収入フォームリセット
+  document.getElementById('income-amount').value='';
+  document.getElementById('income-memo').value='';
+  document.getElementById('income-date').value='';
+  document.getElementById('add-income-btn').disabled=true;
+  document.getElementById('add-income-btn').textContent='収入を記帳する';
+  editingIncomeId = null;
   // タブを支出に戻す
   switchPanelTab('expense');
   editingTxId = null;
@@ -2424,7 +2687,7 @@ function showPage(id, tab){
   document.getElementById('page-'+id).classList.add('active');
   tab.classList.add('active');
   if(id==='settings') renderSettings();
-  if(id==='history')  renderHistory();
+  if(id==='history'){ populateFilterOptions(); renderHistory(); }
   if(id==='report'){
     switchReportTab('weekly');
   }
@@ -2450,7 +2713,8 @@ let editingTxId  = null;
 
 function checkAddBtn(){
   const v = parseInt(document.getElementById('inp-amount').value)||0;
-  document.getElementById('add-tx-btn').disabled = v <= 0;
+  const memo = document.getElementById('inp-memo').value.trim();
+  document.getElementById('add-tx-btn').disabled = (v <= 0 || !memo);
 }
 
 function onWalletSelectChange(){
@@ -2531,6 +2795,7 @@ async function readReceipt(input){
     if(parsed.date){
       document.getElementById('inp-date').value = parsed.date;
     }
+    checkAddBtn();
     showToast('レシートを読み取りました');
 
   } catch(e){
@@ -2558,6 +2823,7 @@ function markApiDirty(){
 // ════════════════════════════════
 renderHome();
 renderSelect();
+populateFilterOptions();
 renderHistory();
 updateReportMonthLabel();
 renderSummaryList();
