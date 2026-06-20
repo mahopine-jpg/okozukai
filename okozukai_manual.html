@@ -183,7 +183,7 @@ tr:last-child td { border-bottom: none; }
   <div class="toc-title">目次</div>
   <a href="#intro"><span class="toc-num">はじめに</span>このアプリでできること</a>
   <a href="#setup"><span class="toc-num">01</span>最初の準備（初回のみ）</a>
-  <a href="#daily"><span class="toc-num">02</span>毎日の使い方（記帳・口座移動）</a>
+  <a href="#daily"><span class="toc-num">02</span>毎日の使い方（記帳・収入・口座移動）</a>
   <a href="#fix"><span class="toc-num">03</span>記帳を間違えたとき</a>
   <a href="#weekly"><span class="toc-num">04</span>週次チェック（毎週金曜夜）</a>
   <a href="#consult"><span class="toc-num">05</span>購入相談と欲しいものリスト</a>
@@ -234,7 +234,7 @@ tr:last-child td { border-bottom: none; }
     <div class="subsection-title">ホーム画面に追加する</div>
     <div class="card">
       <ul class="steps">
-        <li class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">SafariでアプリのURLを開く</div><div class="step-desc">管理者から受け取ったURLを貼り付けて開く</div></div></li>
+        <li class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">SafariでアプリのURLを開く</div><div class="step-desc">お母さんから受け取ったURLを貼り付けて開く</div></div></li>
         <li class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">画面下の共有ボタンをタップ</div><div class="step-desc">□から↑が出ているアイコン</div></div></li>
         <li class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">「ホーム画面に追加」をタップ</div><div class="step-desc">「追加」をタップして完了</div></div></li>
         <li class="step"><div class="step-num">4</div><div class="step-body"><div class="step-title">以降はホーム画面のアイコンから起動する</div></div></li>
@@ -248,7 +248,7 @@ tr:last-child td { border-bottom: none; }
       <ul class="steps">
         <li class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">「設定」タブ →「固定費・連絡先設定」を開く</div></div></li>
         <li class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">ガソリン代・タバコ代の上限を確認・変更する</div><div class="step-desc">デフォルト：ガソリン¥8,500 / タバコ¥10,000</div></div></li>
-        <li class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">週次レポートの送り先メールアドレスを入力する</div><div class="step-desc">送り先のメールアドレス</div></div></li>
+        <li class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">週次レポートの送り先メールアドレスを入力する</div><div class="step-desc">お母さんのメールアドレス</div></div></li>
         <li class="step"><div class="step-num">4</div><div class="step-body"><div class="step-title">「固定費・連絡先を保存」をタップ</div></div></li>
       </ul>
     </div>
@@ -259,7 +259,7 @@ tr:last-child td { border-bottom: none; }
     <div class="card">
       <ul class="steps">
         <li class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">「設定」タブ →「Claude API キー」欄を開く</div></div></li>
-        <li class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">管理者から受け取ったAPIキーを貼り付ける</div><div class="step-desc">sk-ant-... から始まる文字列</div></div></li>
+        <li class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">お母さんから受け取ったAPIキーを貼り付ける</div><div class="step-desc">sk-ant-... から始まる文字列</div></div></li>
         <li class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">「APIキーを保存」をタップ</div><div class="step-desc">保存後はマスク表示になります。キーはこのデバイス内にのみ保存されます。</div></div></li>
       </ul>
     </div>
@@ -278,9 +278,10 @@ tr:last-child td { border-bottom: none; }
     <div class="card">
       <ul class="steps">
         <li class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">ホーム画面で使った口座のカードをタップ</div><div class="step-desc">タップすると記帳パネルが開き、その口座が選択済みになる</div></div></li>
-        <li class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">金額を入力する</div><div class="step-desc">クイックボタン（¥500〜¥10,000）か直接入力</div></div></li>
-        <li class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">メモを入力する（推奨）</div><div class="step-desc">「スーパー」「ガソリン」「タバコ」など品目を入力しておくと月次分析に活用されます</div></div></li>
-        <li class="step"><div class="step-num">4</div><div class="step-body"><div class="step-title">日付を確認して「記帳する」をタップ</div><div class="step-desc">デフォルトは今日。昨日以前の分も日付を変えて記帳できます</div></div></li>
+        <li class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">金額を直接入力する</div></div></li>
+        <li class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">カテゴリを選ぶ</div><div class="step-desc">食費・日用品・趣味・娯楽・交際費・雑費、または固定費（ガソリン代・タバコ代など）から選択。固定費を設定で増やすと選択肢も増えます</div></div></li>
+        <li class="step"><div class="step-num">4</div><div class="step-body"><div class="step-title">内容を入力する（必須）</div><div class="step-desc">「スーパー」「ランチ」など具体的な内容を入力。空欄では記帳できません</div></div></li>
+        <li class="step"><div class="step-num">5</div><div class="step-body"><div class="step-title">日付を確認して「記帳する」をタップ</div><div class="step-desc">デフォルトは今日。昨日以前の分も日付を変えて記帳できます</div></div></li>
       </ul>
     </div>
     <div class="tip tip-info">
@@ -289,7 +290,20 @@ tr:last-child td { border-bottom: none; }
     </div>
     <div class="tip tip-ok">
       <div class="tip-icon">🚬</div>
-      <div>タバコを買ったときは必ずメモに <strong>「タバコ」「たばこ」「煙草」</strong> のいずれかを入力してください。週次・月次の分析で自動集計されます。</div>
+      <div>タバコやガソリンなどの固定費は、カテゴリで該当の固定費項目を選んでください。週次・月次の分析で固定費として自動集計されます。</div>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">収入を記帳する</div>
+    <div class="card">
+      <div class="card-head">例：お小遣いや臨時収入が入ったとき</div>
+      <ul class="steps">
+        <li class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">画面下のパネルハンドルをタップして開く</div></div></li>
+        <li class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">「収入」タブをタップ</div></div></li>
+        <li class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">受け取る口座を選び、金額と内容を入力する</div><div class="step-desc">内容は必須（例：お小遣い、臨時収入）</div></div></li>
+        <li class="step"><div class="step-num">4</div><div class="step-body"><div class="step-title">「収入を記帳する」をタップ</div><div class="step-desc">選んだ口座の残金にその金額が加算されます。履歴には💰収入として残ります。</div></div></li>
+      </ul>
     </div>
   </div>
 
@@ -300,7 +314,7 @@ tr:last-child td { border-bottom: none; }
       <ul class="steps">
         <li class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">画面下のパネルハンドルをタップして開く</div></div></li>
         <li class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">「口座移動」タブをタップ</div></div></li>
-        <li class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">移動元・移動先の口座を選び、金額を入力する</div></div></li>
+        <li class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">移動元・移動先の口座を選び、金額と内容を入力する</div><div class="step-desc">内容は必須（例：PayPayにチャージ）</div></div></li>
         <li class="step"><div class="step-num">4</div><div class="step-body"><div class="step-title">「移動する」をタップ</div><div class="step-desc">履歴に2件（出と入）がペアで記録されます。残高合計には影響しません。</div></div></li>
       </ul>
     </div>
@@ -320,18 +334,19 @@ tr:last-child td { border-bottom: none; }
       <ul class="steps">
         <li class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">「履歴」タブをタップ</div></div></li>
         <li class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">修正したい記帳の ✎ をタップ</div></div></li>
-        <li class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">金額・メモ・日付・口座を修正して「修正を保存する」をタップ</div></div></li>
+        <li class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">金額・カテゴリ・内容・日付・口座を修正して「修正を保存する」をタップ</div></div></li>
       </ul>
     </div>
   </div>
 
   <div class="subsection">
-    <div class="subsection-title">削除する</div>
+    <div class="subsection-title">履歴を絞り込む</div>
     <div class="card">
+      <div class="card-head">特定の月・口座・内容だけを表示したいとき</div>
       <ul class="steps">
-        <li class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">「履歴」タブをタップ</div></div></li>
-        <li class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">削除したい記帳の × をタップ</div><div class="step-desc">口座移動は2件まとめて削除されます</div></div></li>
-        <li class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">確認ダイアログで「OK」をタップ</div></div></li>
+        <li class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">「履歴」タブを開き、上部の「絞り込み」をタップ</div></div></li>
+        <li class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">月・口座を選ぶ、または内容のキーワードを入力する</div><div class="step-desc">複数の条件を組み合わせられます。条件の数がボタン横に表示されます</div></div></li>
+        <li class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">解除したいときは「条件をクリア」をタップ</div></div></li>
       </ul>
     </div>
   </div>
@@ -364,7 +379,7 @@ tr:last-child td { border-bottom: none; }
         <div class="flow-left"><div class="flow-dot"></div><div class="flow-line"></div></div>
         <div class="flow-card">
           <div class="flow-card-title">② 「AIに週次チェックしてもらう」をタップ</div>
-          <div class="flow-card-desc">今週の振り返り・タバコ代の評価・自由費の使い方・来週へのアドバイスが届きます。</div>
+          <div class="flow-card-desc">今週の振り返り・タバコ代の評価・自由費の使い方・来週へのアドバイスが届きます。タバコ代が目標より少なければ思いっきり褒めてもらえます。</div>
         </div>
       </div>
       <div class="flow-item">
@@ -378,7 +393,7 @@ tr:last-child td { border-bottom: none; }
         <div class="flow-left"><div class="flow-dot"></div></div>
         <div class="flow-card">
           <div class="flow-card-title">④ 送信する</div>
-          <div class="flow-card-desc">設定したメールアドレスに送信します。</div>
+          <div class="flow-card-desc">設定したメールアドレス（お母さん）に送信します。</div>
         </div>
       </div>
     </div>
@@ -450,7 +465,7 @@ tr:last-child td { border-bottom: none; }
       <div class="flow-left"><div class="flow-dot"></div><div class="flow-line"></div></div>
       <div class="flow-card">
         <div class="flow-card-title">② 「月次分析・AI評価を出す」をタップ</div>
-        <div class="flow-card-desc">メモ別の支出グラフが表示され、AIが無駄遣いの指摘・タバコ代の評価・来月へのアドバイスをしてくれます。</div>
+        <div class="flow-card-desc">カテゴリ別の支出グラフが表示され、AIが無駄遣いの指摘・タバコ代の評価・来月へのアドバイスをしてくれます。</div>
       </div>
     </div>
     <div class="flow-item">
@@ -495,11 +510,13 @@ tr:last-child td { border-bottom: none; }
         <tr><td>開いたらデータがない</td><td>ブラウザとホーム画面アプリを混在させていないか確認。どちらか一方に統一する</td></tr>
         <tr><td>口座の予算を変えたい</td><td>設定タブ → 口座一覧で編集 → 保存</td></tr>
         <tr><td>口座を増やしたい・減らしたい</td><td>設定タブ → ＋追加 または ×削除 → 保存</td></tr>
+        <tr><td>収入（お小遣いなど）を記録したい</td><td>記帳パネル →「収入」タブ → 口座・金額・内容を入力</td></tr>
+        <tr><td>特定の月や口座の履歴だけ見たい</td><td>履歴タブ →「絞り込み」で月・口座・内容を指定</td></tr>
         <tr><td>先月の記帳を見たい</td><td>履歴タブ（全件表示されます）</td></tr>
         <tr><td>先週・先月の集計を見たい</td><td>集計タブ → 週次または月次 → 「‹」で戻る</td></tr>
         <tr><td>貯金がいくら貯まったか確認したい</td><td>ホーム画面の「🏦 貯金口座」カードを確認</td></tr>
         <tr><td>欲しいものリストを見たい</td><td>集計タブ →「欲しいもの」タブ</td></tr>
-        <tr><td>AI評価でエラーが出る</td><td>少し待ってから再試行。それでも解決しない場合は管理者に連絡</td></tr>
+        <tr><td>AI評価でエラーが出る</td><td>少し待ってから再試行。それでも解決しない場合はお母さんに連絡</td></tr>
         <tr><td>全データをリセットしたい（ブラウザ側）</td><td>設定タブ → 「🗑 完全リセット」をタップ</td></tr>
         <tr><td>機種変更前にデータを残したい</td><td>集計タブ →「📊 月次サマリCSVを出力」でバックアップを保存</td></tr>
       </tbody>
@@ -518,7 +535,7 @@ tr:last-child td { border-bottom: none; }
     <div class="rule-icon">📝</div>
     <div class="rule-body">
       <div class="rule-title">毎日の習慣</div>
-      <div class="rule-desc">お金を使ったらその場で記帳する。メモ欄には品目を入力する。タバコを買ったら「タバコ」「たばこ」「煙草」のいずれかをメモに入力する。</div>
+      <div class="rule-desc">お金を使ったらその場で記帳する。カテゴリを選び、内容欄に具体的な内容を入力する。タバコやガソリンなどの固定費は、カテゴリで該当の固定費項目を選ぶ。</div>
     </div>
   </div>
   <div class="rule-card">
