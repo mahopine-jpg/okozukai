@@ -309,6 +309,45 @@ body {
   transition: all .1s; display: flex; align-items: center; justify-content: center;
 }
 .del-btn:active { background: var(--danger-bg); border-color: var(--danger); color: var(--danger); }
+/* 定例項目（固定支出・積立） */
+.recurring-row {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px; border-bottom: 1px solid var(--border);
+}
+.recurring-row:last-child { border-bottom: none; }
+.rec-line { display: flex; gap: 8px; align-items: center; }
+.rec-arrow { font-size: 15px; font-weight: 900; color: var(--muted); flex-shrink: 0; }
+.rec-goal-label { font-size: 12px; font-weight: 700; color: var(--muted); flex-shrink: 0; }
+.rec-sel {
+  flex: 1; min-width: 0;
+  background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 8px; color: var(--text); font-family: var(--sans);
+  font-size: 14px; font-weight: 700; padding: 9px 8px; outline: none;
+  transition: border-color .15s;
+}
+.rec-sel:focus { border-color: var(--text); }
+.rec-payee, .rec-memo {
+  flex: 2; min-width: 0;
+  background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 8px; color: var(--text); font-family: var(--sans);
+  font-size: 14px; font-weight: 700; padding: 9px 10px; outline: none;
+  transition: border-color .15s;
+}
+.rec-payee:focus, .rec-memo:focus { border-color: var(--text); }
+.rec-amount, .rec-goal {
+  flex: 1; min-width: 0;
+  background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 8px; color: var(--text); font-family: var(--sans);
+  font-size: 14px; font-weight: 900; padding: 9px 8px;
+  text-align: right; outline: none; transition: border-color .15s;
+}
+.rec-amount:focus, .rec-goal:focus { border-color: var(--text); }
+.rec-goaldate {
+  flex: 1.4; min-width: 0;
+  background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 8px; color: var(--text); font-family: var(--sans);
+  font-size: 13px; font-weight: 700; padding: 8px; outline: none;
+}
 .add-wallet-btn {
   width: 100%; background: none; border: 1.5px dashed var(--border2);
   border-radius: 10px; color: var(--muted); font-family: var(--sans);
@@ -658,6 +697,25 @@ body {
     </div>
     <button class="save-btn" id="save-fixed-btn" onclick="saveFixedSettings()" disabled>固定費・連絡先を保存</button>
 
+    <div class="sec-label" style="margin-top:12px">定例項目（毎月の固定支出・積立）</div>
+    <div class="setting-card">
+      <div class="setting-head">
+        <div class="setting-head-title">固定支出（家賃・サブスクなど）</div>
+        <div class="setting-head-sub" style="font-size:12px">出金元 → 支払先・金額</div>
+      </div>
+      <div id="recurring-fixed-settings"></div>
+    </div>
+    <button class="add-wallet-btn" onclick="addRecurringItem('fixed')">＋ 固定支出を追加</button>
+    <div class="setting-card" style="margin-top:8px">
+      <div class="setting-head">
+        <div class="setting-head-title">積立（口座への振り分け）</div>
+        <div class="setting-head-sub" style="font-size:12px">移動元 → 積立先・金額</div>
+      </div>
+      <div id="recurring-reserve-settings"></div>
+    </div>
+    <button class="add-wallet-btn" onclick="addRecurringItem('reserve')">＋ 積立を追加</button>
+    <button class="save-btn" id="save-recurring-btn" onclick="saveRecurring()" disabled>定例項目を保存</button>
+
     <div class="sec-label" style="margin-top:12px">Claude API キー</div>
     <div class="setting-card">
       <div class="api-row">
@@ -828,6 +886,7 @@ const KEY_SAVINGS  = 'wlt_savings';
 const KEY_SUMMARY  = 'wlt_summary';
 const KEY_WISHLIST = 'wlt_wishlist';
 const KEY_FIXED    = 'wlt_fixed';    // {gas, tobacco, email}
+const KEY_RECURRING= 'wlt_recurring';// [{id,kind,fromWallet,toWallet,payee,amount,memo,goal,goalDate}]
 
 // ════════════════════════════════
 //  State
@@ -863,6 +922,8 @@ function loadFixedCosts(){
   return raw;
 }
 let fixedCosts = loadFixedCosts();
+// 定例項目（固定支出 fixed / 積立 reserve）
+let recurring = LS.get(KEY_RECURRING) || [];
 
 // ── カテゴリ ──
 // 変動費カテゴリ（固定） + 固定費カテゴリ（固定費設定の項目名から動的生成）
@@ -901,6 +962,24 @@ function fixedSpentInMonth(y, m){
   }).reduce((s,h) => s + h.amount, 0);
 }
 function fixedSpentThisMonth(){ return fixedSpentInMonth(now().getFullYear(), now().getMonth()+1); }
+
+// 固定費の項目別実支出（当月）。{name, amount(上限), spent} の配列を返す
+function fixedSpentByItem(y, m){
+  const yy = y ?? now().getFullYear();
+  const mm = m ?? (now().getMonth()+1);
+  const target = ym(yy, mm);
+  return fixedCosts.items.map(it => {
+    const spent = history.filter(h => {
+      if(ym(h.year, h.month) !== target) return false;
+      if(h.rolledOver || h.type === 'transfer' || h.type === 'income') return false;
+      // タバコは専用判定（メモ照合）。それ以外はカテゴリ優先＋メモフォールバック
+      if(isTobacco(it.name)) return isTobacco(h.memo) || h.category === it.name;
+      if(h.category) return h.category === it.name;
+      return h.memo && h.memo.includes(it.name);
+    }).reduce((s,h) => s + h.amount, 0);
+    return { name: it.name, amount: it.amount, spent };
+  });
+}
 
 // 購入相談の一時保存
 let lastConsultName  = '';
@@ -1469,6 +1548,8 @@ function renderSettings(){
   // APIキー表示
   const stored = LS.get(KEY_API)||'';
   document.getElementById('inp-api').value = stored ? '●'.repeat(20) : '';
+  // 定例項目
+  renderRecurring();
 }
 
 let fixedDirty = false;
@@ -1509,6 +1590,118 @@ function delFixedItem(i){
   fixedCosts.items.splice(i, 1);
   renderSettings();
   markFixedDirty();
+}
+
+// ── 定例項目（固定支出・積立） ──
+let recurringDirty = false;
+function markRecurringDirty(){
+  recurringDirty = true;
+  document.getElementById('save-recurring-btn').disabled = false;
+}
+function walletOptionsHtml(selectedName){
+  return wallets.map(w =>
+    `<option value="${w.name}"${w.name===selectedName?' selected':''}>${w.name}</option>`
+  ).join('');
+}
+function renderRecurring(){
+  const fc = document.getElementById('recurring-fixed-settings');
+  const rc = document.getElementById('recurring-reserve-settings');
+  if(!fc || !rc) return;
+  fc.innerHTML = '';
+  rc.innerHTML = '';
+  recurring.forEach((it, i) => {
+    const row = document.createElement('div');
+    row.className = 'recurring-row';
+    row.dataset.idx = i;
+    if(it.kind === 'fixed'){
+      row.innerHTML = `
+        <div class="rec-line">
+          <select class="rec-sel" oninput="markRecurringDirty()" data-field="fromWallet">${walletOptionsHtml(it.fromWallet)}</select>
+          <span class="rec-arrow">→</span>
+          <input class="rec-payee" type="text" value="${it.payee||''}" placeholder="支払先（家賃の振込先など）" oninput="markRecurringDirty()" data-field="payee">
+        </div>
+        <div class="rec-line">
+          <span class="budget-yen">¥</span>
+          <input class="rec-amount" type="number" value="${it.amount||0}" placeholder="金額" inputmode="numeric" oninput="markRecurringDirty()" data-field="amount">
+          <input class="rec-memo" type="text" value="${it.memo||''}" placeholder="備考メモ" oninput="markRecurringDirty()" data-field="memo">
+          <button class="del-btn" onclick="delRecurringItem(${i})">×</button>
+        </div>`;
+      fc.appendChild(row);
+    } else {
+      row.innerHTML = `
+        <div class="rec-line">
+          <select class="rec-sel" oninput="markRecurringDirty()" data-field="fromWallet">${walletOptionsHtml(it.fromWallet)}</select>
+          <span class="rec-arrow">→</span>
+          <select class="rec-sel" oninput="markRecurringDirty()" data-field="toWallet">${walletOptionsHtml(it.toWallet)}</select>
+        </div>
+        <div class="rec-line">
+          <span class="budget-yen">¥</span>
+          <input class="rec-amount" type="number" value="${it.amount||0}" placeholder="金額" inputmode="numeric" oninput="markRecurringDirty()" data-field="amount">
+          <input class="rec-memo" type="text" value="${it.memo||''}" placeholder="備考メモ" oninput="markRecurringDirty()" data-field="memo">
+          <button class="del-btn" onclick="delRecurringItem(${i})">×</button>
+        </div>
+        <div class="rec-line">
+          <span class="rec-goal-label">目標額</span>
+          <span class="budget-yen">¥</span>
+          <input class="rec-goal" type="number" value="${it.goal||''}" placeholder="任意" inputmode="numeric" oninput="markRecurringDirty()" data-field="goal">
+          <span class="rec-goal-label">期日</span>
+          <input class="rec-goaldate" type="date" value="${it.goalDate||''}" oninput="markRecurringDirty()" data-field="goalDate">
+        </div>`;
+      rc.appendChild(row);
+    }
+  });
+}
+function addRecurringItem(kind){
+  if(kind === 'fixed'){
+    recurring.push({ id:'r'+Date.now(), kind:'fixed', fromWallet:wallets[0]?.name||'', payee:'', amount:0, memo:'' });
+  } else {
+    recurring.push({ id:'r'+Date.now(), kind:'reserve', fromWallet:wallets[0]?.name||'', toWallet:wallets[1]?.name||wallets[0]?.name||'', amount:0, memo:'', goal:'', goalDate:'' });
+  }
+  renderRecurring();
+  markRecurringDirty();
+}
+function delRecurringItem(i){
+  const it = recurring[i];
+  const label = it ? (it.kind==='fixed' ? (it.payee||'固定支出') : (it.memo||'積立')) : '';
+  if(label && !confirm(`「${label}」を削除しますか？`)) return;
+  recurring.splice(i, 1);
+  renderRecurring();
+  markRecurringDirty();
+}
+function saveRecurring(){
+  const rows = document.querySelectorAll('#recurring-fixed-settings .recurring-row, #recurring-reserve-settings .recurring-row');
+  const items = Array.from(rows).map(row => {
+    const i = parseInt(row.dataset.idx);
+    const base = recurring[i] || {};
+    const kind = base.kind;
+    const get = f => { const el = row.querySelector(`[data-field="${f}"]`); return el ? el.value : ''; };
+    if(kind === 'fixed'){
+      return {
+        id: base.id || 'r'+Date.now()+Math.random().toString(36).slice(2,5),
+        kind:'fixed',
+        fromWallet: get('fromWallet'),
+        payee: get('payee').trim(),
+        amount: parseInt(get('amount')) || 0,
+        memo: get('memo').trim()
+      };
+    } else {
+      return {
+        id: base.id || 'r'+Date.now()+Math.random().toString(36).slice(2,5),
+        kind:'reserve',
+        fromWallet: get('fromWallet'),
+        toWallet: get('toWallet'),
+        amount: parseInt(get('amount')) || 0,
+        memo: get('memo').trim(),
+        goal: parseInt(get('goal')) || '',
+        goalDate: get('goalDate') || ''
+      };
+    }
+  });
+  recurring = items;
+  LS.set(KEY_RECURRING, recurring);
+  recurringDirty = false;
+  document.getElementById('save-recurring-btn').disabled = true;
+  showToast('✓ 定例項目を保存しました');
 }
 
 function addWallet(){
@@ -1564,7 +1757,7 @@ function saveApiKey(){
 // ════════════════════════════════
 function exportBackup(){
   const data = {
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     wallets:          LS.get(KEY_WALLETS)  || wallets,
     history:          LS.get(KEY_HISTORY)  || history,
@@ -1572,6 +1765,7 @@ function exportBackup(){
     monthlySummaries: LS.get(KEY_SUMMARY)  || monthlySummaries,
     wishList:         LS.get(KEY_WISHLIST) || wishList,
     fixedCosts:       LS.get(KEY_FIXED)    || fixedCosts,
+    recurring:        LS.get(KEY_RECURRING)|| recurring,
   };
   const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], {type: 'application/json'});
@@ -1604,6 +1798,7 @@ function importBackup(input){
       if(data.monthlySummaries) { monthlySummaries = data.monthlySummaries;  LS.set(KEY_SUMMARY,  monthlySummaries); }
       if(data.wishList)         { wishList = data.wishList;                  LS.set(KEY_WISHLIST, wishList); }
       if(data.fixedCosts)       { fixedCosts = data.fixedCosts;              LS.set(KEY_FIXED,    fixedCosts); }
+      if(data.recurring)        { recurring = data.recurring;                LS.set(KEY_RECURRING, recurring); }
       renderHome(); renderHistory(); renderSummaryList(); renderSelect(); renderSettings();
       showToast('✓ バックアップから復元しました');
     } catch(err) {
@@ -1627,7 +1822,7 @@ function resetEverything(){
   if(!confirm('すべてのデータ（記帳履歴・貯金・月次サマリ・欲しいものリスト・口座設定・固定費・APIキー）を完全に削除します。\nデフォルトの状態に戻ります。\nよろしいですか？')) return;
   if(!confirm('本当に削除してよいですか？この操作は元に戻せません。')) return;
   localStorage.clear();
-  history=[]; savings=0; monthlySummaries=[]; wishList=[];
+  history=[]; savings=0; monthlySummaries=[]; wishList=[]; recurring=[];
   fixedCosts = { items:[{id:'gas',name:'ガソリン代',amount:8500},{id:'tobacco',name:'タバコ代',amount:8000},{id:'parking',name:'駐車場定期代',amount:10000}], email:'' };
   wallets = [
     {name:'代表口座(デビット用)', budget:47500},
@@ -1704,35 +1899,37 @@ function renderWeeklyStats(){
     .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer' && h.type!=='income')
     .reduce((s,h)=>s+h.amount,0);
 
-  // 今月のタバコ代
-  const tobaccoSpent = history
-    .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer' && h.type!=='income'
-              && isTobacco(h.memo))
-    .reduce((s,h)=>s+h.amount,0);
-
   // 残高
   const totalBudget = wallets.reduce((s,w)=>s+w.budget,0);
   const totalRem = totalBudget - wallets.reduce((s,w)=>s+spentThisMonth(w.name),0);
 
-  // 自由費残り
-  // 自由費予算 = 月予算 - 固定費設定合計
-  // 固定費実支出 = 固定費リスト項目名がメモに含まれる支出の合計
-  // まだ使っていない固定費予算分は自由費に回せないため残高から除く
-  // 固定費を節約して実支出が設定合計より少なければ、その差額が自由費に回る
+  // 自由費の計算
+  // 自由費予算 = 月予算合計 - 固定費設定合計
+  // 自由費実支出 = 今月の支出のうち固定費カテゴリ以外
+  // 自由費残り = 自由費予算 - 自由費実支出
   const d = now();
   const daysInMonth = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
   const remainDays  = daysInMonth - d.getDate();
   const fixedItemsTotal = fixedTotal();
   const fixedActual  = fixedSpentThisMonth();
-  const fixedUnspent = Math.max(0, fixedItemsTotal - fixedActual);
-  const freeRem      = totalRem - fixedUnspent;
+  const freeBudget   = Math.max(0, totalBudget - fixedItemsTotal);
+  const freeSpent    = Math.max(0, monthSpent - fixedActual);
+  const freeRem      = freeBudget - freeSpent;
+
+  // 固定費の項目別（実支出 / 上限）
+  const fixedItems = fixedSpentByItem();
+  const fixedRows = fixedItems.map(it => {
+    const pct = it.amount > 0 ? Math.round(it.spent / it.amount * 100) : 0;
+    const over = it.amount > 0 && it.spent > it.amount;
+    return `<div class="report-row"><div class="report-row-name">${it.name}（今月）</div><div class="report-row-right"><span class="report-row-val"${over?' style="color:var(--danger)"':''}>¥${fmt(it.spent)}</span><span class="report-row-sub">/ ¥${fmt(it.amount)}</span></div></div>`;
+  }).join('');
 
   const c = document.getElementById('weekly-stats');
   c.innerHTML = `
     <div class="report-row"><div class="report-row-name">今週の支出</div><div class="report-row-right"><span class="report-row-val">¥${fmt(weekSpent)}</span></div></div>
     <div class="report-row"><div class="report-row-name">今月の残高</div><div class="report-row-right"><span class="report-row-val">¥${fmt(totalRem)}</span><span class="report-row-sub">残${remainDays}日</span></div></div>
-    <div class="report-row"><div class="report-row-name">タバコ代（今月）</div><div class="report-row-right"><span class="report-row-val">¥${fmt(tobaccoSpent)}</span><span class="report-row-sub">/ ¥${fmt(tobaccoLimit())}</span></div></div>
-    <div class="report-row" style="border-bottom:none"><div class="report-row-name">自由費残り</div><div class="report-row-right"><span class="report-row-val">¥${fmt(freeRem)}</span></div></div>`;
+    ${fixedRows}
+    <div class="report-row" style="border-bottom:none"><div class="report-row-name">自由費残り</div><div class="report-row-right"><span class="report-row-val"${freeRem<0?' style="color:var(--danger)"':''}>¥${fmt(freeRem)}</span><span class="report-row-sub">/ ¥${fmt(freeBudget)}</span></div></div>`;
 }
 
 async function runWeeklyCheck(){
@@ -1768,15 +1965,15 @@ async function runWeeklyCheck(){
   const paceJudge    = budgetPct <= monthPct - 10 ? '余裕あり'
                      : budgetPct <= monthPct + 5  ? 'ほぼ想定通り'
                      : '使いすぎに注意';
-  const tobaccoSpent = history
-    .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer' && h.type!=='income'
-              && isTobacco(h.memo))
-    .reduce((s,h)=>s+h.amount,0);
-
   const memoList = weekTx.map(h=>`・${h.memo||'（メモなし）'}：¥${fmt(h.amount)}`).join('\n') || '・記帳なし';
-  const tobaccoStatus = tobaccoSpent <= tobaccoLimit()
-    ? `今月のタバコ代は¥${fmt(tobaccoSpent)}（上限¥${fmt(tobaccoLimit())}）で目標内です。`
-    : `今月のタバコ代は¥${fmt(tobaccoSpent)}で、上限¥${fmt(tobaccoLimit())}を超えています。`;
+  // 固定費の項目別ステータス（実支出/上限、超過は明示）
+  const fixedStatusItems = fixedSpentByItem();
+  const fixedStatus = fixedStatusItems.length
+    ? '【固定費の状況（今月）】\\n' + fixedStatusItems.map(it => {
+        const over = it.amount > 0 && it.spent > it.amount;
+        return `・${it.name}：¥${fmt(it.spent)}/¥${fmt(it.amount)}${over?'（超過）':'（目標内）'}`;
+      }).join('\\n')
+    : '';
 
   // 欲しいものリスト（検討中）
   const wishItems = wishList.filter(w=>w.status==='considering');
@@ -1804,13 +2001,13 @@ ${memoList}
 【今月のペース（${elapsedDays}日経過/${daysInMonth2}日、月の${monthPct}%）】
 予算消化率：${budgetPct}%（¥${fmt(totalSpentSoFar)}/¥${fmt(totalBudget)}）→ ${paceJudge}
 残高：¥${fmt(totalRem)}（残り${remainDays}日）
-${tobaccoStatus}
+${fixedStatus}
 自由費（固定費${fixedListStr}を除いた予算）：¥${fmt(freeTotal)}、使用済み¥${fmt(freeSpentSoFar)}、残り¥${fmt(Math.max(0,freeTotal-freeSpentSoFar))}${wishText}
 
 以下の順でコメントしてください。
 1. 今週の注目支出に触れながら全体の振り返り（事実ベースで端的に）
 2. 今月のペース評価（月経過${monthPct}%に対して予算消化${budgetPct}%という数字を使って具体的に）
-3. タバコ代の評価（目標内なら褒める、超えていたら優しく指摘）
+3. 固定費の評価（各項目について、目標内なら褒める、超えていたら優しく指摘。特に超過している項目があれば優先的に触れる）
 4. 来週・今月残りへの一言アドバイス
 
 文体はフラットで簡潔に。読んだ瞬間に状況が把握できるよう、数字を積極的に使う。500文字以内。`;
@@ -1840,10 +2037,6 @@ function shareWeeklyMail(){
   const totalBudget = wallets.reduce((s,w)=>s+w.budget,0);
   const totalSpentSoFar = wallets.reduce((s,w)=>s+spentThisMonth(w.name),0);
   const totalRem    = totalBudget - totalSpentSoFar;
-  const tobaccoSpent = history
-    .filter(h => ym(h.year,h.month)===cym && !h.rolledOver && h.type!=='transfer' && h.type!=='income'
-              && isTobacco(h.memo))
-    .reduce((s,h)=>s+h.amount,0);
   const weekTx = history.filter(h => {
     if(h.rolledOver||h.type==='transfer'||h.type==='income') return false;
     const dt = new Date(h.year, h.month-1, h.day);
@@ -1872,6 +2065,15 @@ function shareWeeklyMail(){
                      : '使いすぎに注意';
   const remainDays3  = daysInMonth3 - elapsedDays3;
 
+  // 固定費（項目別）
+  const fixedMailItems = fixedSpentByItem();
+  const fixedSection = fixedMailItems.length
+    ? fixedMailItems.map(it => {
+        const pct = it.amount > 0 ? Math.round(it.spent / it.amount * 100) : '-';
+        return `  ${(it.name).padEnd(8,'　')}¥${fmt(it.spent)} / ¥${fmt(it.amount)}（${pct}%）`;
+      }).join('\n')
+    : '  （固定費なし）';
+
   // 欲しいものリスト
   const wishItems = wishList.filter(w=>w.status==='considering');
   const wishSection = wishItems.length
@@ -1893,8 +2095,8 @@ ${detailLines}
   月の経過：${monthPct3}%　→　${paceJudge3}
   残高：¥${fmt(totalRem)}（残り${remainDays3}日）
 
-■ タバコ代（今月）
-  ¥${fmt(tobaccoSpent)} / ¥${fmt(tobaccoLimit())}（${tobaccoLimit()>0?Math.round(tobaccoSpent/tobaccoLimit()*100):'-'}%消化）
+■ 固定費（今月）
+${fixedSection}
 ${wishSection}
 ━━━━━━━━━━━━━━━━━━━━
 ■ 今週のAIコメント
@@ -2384,6 +2586,14 @@ async function runMonthlyReport(){
 
   const spendList = sorted.map(([memo,amt])=>`・${memo}：¥${fmt(amt)}`).join('\n');
   const tobaccoSpent = sorted.filter(([m])=>isTobacco(m)).reduce((s,[,v])=>s+v,0);
+  // 固定費の項目別（当月、実支出/上限）
+  const fixedMonthItems = fixedSpentByItem(reportYear, reportMonth);
+  const fixedBreakdown = fixedMonthItems.length
+    ? fixedMonthItems.map(it => {
+        const over = it.amount > 0 && it.spent > it.amount;
+        return `・${it.name}：¥${fmt(it.spent)}/¥${fmt(it.amount)}${over?'（超過）':'（目標内）'}`;
+      }).join('\n')
+    : '・（固定費なし）';
 
   // 欲しいものリスト — 今月購入分
   const targetYM = ym(reportYear, reportMonth);
@@ -2424,7 +2634,8 @@ async function runMonthlyReport(){
 【${reportYear}年${reportMonth}月の支出内訳（メモ別）】
 ${spendList}
 合計：¥${fmt(total)}　予算：¥${fmt(monthlyBudget)}
-タバコ代：¥${fmt(tobaccoSpent)}（月の目標¥${fmt(tobaccoLimit())}）
+【固定費の状況】
+${fixedBreakdown}
 自由費（固定費${fixedListStr3}を除く）：予算¥${fmt(freeTotal)}　実績¥${fmt(freeSpent)}${wishSection}${savingsNote}
 
 【アドバイスの観点】
@@ -2436,7 +2647,7 @@ ${spendList}
 以下の順でコメントしてください。
 1. 全体の評価（自由費の使い方・配分の観点で）
 2. 無駄遣いと思われる項目を具体的に指摘（あれば）
-3. タバコ代の評価（目標より少なければ思いっきり褒める）
+3. 固定費の評価（各項目について、目標より少なければ思いっきり褒め、超過があれば優しく指摘）
 4. 貯金購入・引き出しへの言及（ある場合のみ）
 5. 来月の自由費をもっと上手に使うためのアドバイス＋応援の一言
 
@@ -2673,13 +2884,14 @@ function renderSummaryList(){
 }
 
 function showPage(id, tab){
-  if((walletsDirty || apiDirty || fixedDirty) && currentPage === 'settings' && id !== 'settings'){
+  if((walletsDirty || apiDirty || fixedDirty || recurringDirty) && currentPage === 'settings' && id !== 'settings'){
     const leave = window.confirm('設定が保存されていません。\nこのまま移動すると変更が失われます。\n移動しますか？');
     if(!leave) return;
-    walletsDirty = false; apiDirty = false; fixedDirty = false;
+    walletsDirty = false; apiDirty = false; fixedDirty = false; recurringDirty = false;
     document.getElementById('save-wallets-btn').disabled = true;
     document.getElementById('save-api-btn').disabled = true;
     document.getElementById('save-fixed-btn').disabled = true;
+    document.getElementById('save-recurring-btn').disabled = true;
   }
   currentPage = id;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
