@@ -348,6 +348,35 @@ body {
   border-radius: 8px; color: var(--text); font-family: var(--sans);
   font-size: 13px; font-weight: 700; padding: 8px; outline: none;
 }
+/* 月次タブ：今月の定例項目 */
+.rec-mhead {
+  display: flex; justify-content: space-between; align-items: center;
+  margin: 4px 0 10px;
+}
+.rec-selall { font-size: 13px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.rec-selall input { width: 18px; height: 18px; accent-color: var(--text); }
+.rec-mcount { font-size: 12px; font-weight: 700; color: var(--muted); }
+.rec-mgroup { font-size: 11px; font-weight: 700; color: var(--muted); margin: 12px 0 6px; letter-spacing: .5px; }
+.rec-mrow {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 10px; padding: 11px 12px; margin-bottom: 8px;
+}
+.rec-mrow.posted { background: #eef3e6; border-color: #c8dba8; opacity: .9; }
+.rec-check { width: 18px; height: 18px; accent-color: var(--text); flex-shrink: 0; }
+.rec-posted-badge {
+  font-size: 11px; font-weight: 700; color: #3b6d11;
+  background: #dcebc4; padding: 3px 8px; border-radius: 6px;
+  white-space: nowrap; flex-shrink: 0; align-self: flex-start;
+}
+.rec-mbody { flex: 1; min-width: 0; }
+.rec-mtitle { font-size: 14px; font-weight: 700; color: var(--text); }
+.rec-msub { font-size: 11px; font-weight: 700; color: var(--muted); margin-top: 2px; }
+.rec-mamt { font-size: 15px; font-weight: 900; color: var(--text); flex-shrink: 0; }
+.rec-mamt.muted { color: var(--muted); }
+.rec-bar-wrap { height: 6px; background: var(--bg2); border-radius: 3px; overflow: hidden; margin-top: 7px; }
+.rec-bar-fill { height: 100%; background: var(--text); border-radius: 3px; }
+.rec-bar-label { font-size: 10px; font-weight: 700; color: var(--muted); margin-top: 3px; }
 .add-wallet-btn {
   width: 100%; background: none; border: 1.5px dashed var(--border2);
   border-radius: 10px; color: var(--muted); font-family: var(--sans);
@@ -642,6 +671,10 @@ body {
         <div class="month-display" id="report-month-label"></div>
         <button class="month-btn" onclick="changeReportMonth(1)">›</button>
       </div>
+
+      <!-- 今月の定例項目（計上） -->
+      <div id="recurring-monthly" style="margin-bottom:18px"></div>
+
       <button class="report-btn" id="report-btn" onclick="runMonthlyReport()">月次分析・AI評価を出す</button>
       <div id="report-output" style="display:none">
         <div class="report-card" style="margin-bottom:8px">
@@ -864,6 +897,19 @@ body {
       </div>
       <button class="add-btn" id="sa-btn" onclick="doSavingsAdjust()" disabled style="margin-top:4px">この金額に修正する</button>
     </div>
+  </div>
+</div>
+
+<!-- 定例項目 計上モーダル -->
+<div id="recpost-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:300;align-items:flex-end;justify-content:center" onclick="closeRecPostModal(event)">
+  <div id="recpost-modal" style="background:var(--surface);border-radius:20px 20px 0 0;padding:20px 20px 44px;width:100%;max-width:480px;box-sizing:border-box" onclick="event.stopPropagation()">
+    <div style="width:36px;height:3px;background:var(--border2);border-radius:2px;margin:0 auto 16px"></div>
+    <div style="font-size:13px;font-weight:700;color:var(--muted);letter-spacing:1px;margin-bottom:14px">定例項目を計上する</div>
+    <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px">計上する項目（<span id="recpost-count">0</span>件）</div>
+    <div id="recpost-list" style="background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:13px;font-weight:700;color:var(--text);max-height:200px;overflow-y:auto"></div>
+    <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px">計上日（全項目共通）</div>
+    <input type="date" class="inp-memo" id="recpost-date" style="width:100%;margin-bottom:14px;box-sizing:border-box">
+    <button class="add-btn" id="recpost-btn" onclick="confirmRecurringPost()" style="margin-top:0">計上する</button>
   </div>
 </div>
 
@@ -1846,7 +1892,200 @@ function switchReportTab(tab){
   });
   if(tab==='weekly')  { updateWeekLabel(); renderWeeklyStats(); }
   if(tab==='wish')    renderWishList();
-  if(tab==='monthly'){ updateReportMonthLabel(); renderSummaryList(); }
+  if(tab==='monthly'){ updateReportMonthLabel(); renderRecurringMonthly(); renderSummaryList(); }
+}
+
+// ════════════════════════════════
+//  今月の定例項目（計上）
+// ════════════════════════════════
+// 選択状態（recurringId の Set）
+let recPostChecked = new Set();
+
+// 指定した定例項目が対象年月に計上済みか
+function isRecurringPosted(recId, y, m){
+  const target = ym(y, m);
+  return history.some(h => h.recurringId === recId && ym(h.year, h.month) === target);
+}
+// 積立先口座の累計（recurringId 付き reserve の移動入を全期間合計）
+function reserveAccumulated(recId){
+  return history
+    .filter(h => h.recurringId === recId && h.type === 'transfer' && h.transferDir === 'in')
+    .reduce((s,h) => s + h.amount, 0);
+}
+// 固定支出のカテゴリ決定：支払先が固定費項目名と一致すれば固定費カテゴリ、なければ空欄
+function fixedPostCategory(payee){
+  return fixedCategoryNames().includes(payee) ? payee : '';
+}
+
+function renderRecurringMonthly(){
+  const box = document.getElementById('recurring-monthly');
+  if(!box) return;
+  if(!recurring.length){ box.innerHTML = ''; return; }
+
+  const y = reportYear, m = reportMonth;
+  const fixedItems   = recurring.filter(it => it.kind === 'fixed');
+  const reserveItems = recurring.filter(it => it.kind === 'reserve');
+
+  // 未計上のうちチェック対象を集計
+  const unposted = recurring.filter(it => !isRecurringPosted(it.id, y, m));
+  const postedCount = recurring.length - unposted.length;
+  // 既定で未計上を全選択（初回描画時のみ）
+  recPostChecked = new Set([...recPostChecked].filter(id => unposted.some(it => it.id === id)));
+
+  const itemHtml = (it) => {
+    const posted  = isRecurringPosted(it.id, y, m);
+    const checked = recPostChecked.has(it.id);
+    if(it.kind === 'fixed'){
+      const sub = `${it.fromWallet||'—'} → ${it.payee||'—'}`;
+      const left = posted
+        ? `<span class="rec-posted-badge">計上済</span>`
+        : `<input type="checkbox" class="rec-check" ${checked?'checked':''} onchange="toggleRecurringCheck('${it.id}')">`;
+      return `<div class="rec-mrow${posted?' posted':''}">
+        ${left}
+        <div class="rec-mbody">
+          <div class="rec-mtitle">${it.payee||'（支払先未設定）'}</div>
+          <div class="rec-msub">${sub}</div>
+        </div>
+        <div class="rec-mamt${posted?' muted':''}">¥${fmt(it.amount)}</div>
+      </div>`;
+    } else {
+      const sub = `${it.fromWallet||'—'} → ${it.toWallet||'—'}`;
+      const acc = reserveAccumulated(it.id);
+      let bar = '';
+      if(it.goal && it.goal > 0){
+        const pct = Math.min(100, Math.round(acc / it.goal * 100));
+        const dateStr = it.goalDate ? `・期日 ${it.goalDate}` : '';
+        bar = `<div class="rec-bar-wrap"><div class="rec-bar-fill" style="width:${pct}%"></div></div>
+          <div class="rec-bar-label">¥${fmt(acc)} / ¥${fmt(it.goal)}（${pct}%）${dateStr}</div>`;
+      }
+      const left = posted
+        ? `<span class="rec-posted-badge">計上済</span>`
+        : `<input type="checkbox" class="rec-check" ${checked?'checked':''} onchange="toggleRecurringCheck('${it.id}')">`;
+      return `<div class="rec-mrow${posted?' posted':''}">
+        ${left}
+        <div class="rec-mbody">
+          <div class="rec-mtitle">${it.memo||'（積立）'}</div>
+          <div class="rec-msub">${sub}</div>
+          ${bar}
+        </div>
+        <div class="rec-mamt${posted?' muted':''}" style="align-self:flex-start">¥${fmt(it.amount)}</div>
+      </div>`;
+    }
+  };
+
+  const allUnpostedChecked = unposted.length > 0 && unposted.every(it => recPostChecked.has(it.id));
+  const selCount = recPostChecked.size;
+
+  let html = `<div class="sec-label" style="padding-left:0">今月の定例項目（${y}年${m}月）</div>`;
+  html += `<div class="rec-mhead">
+    <label class="rec-selall"><input type="checkbox" ${allUnpostedChecked?'checked':''} ${unposted.length?'':'disabled'} onchange="toggleRecurringSelectAll()"> すべて選択</label>
+    <span class="rec-mcount">未計上 ${unposted.length} ／ 計上済 ${postedCount}</span>
+  </div>`;
+
+  if(fixedItems.length){
+    html += `<div class="rec-mgroup">固定支出</div>`;
+    html += fixedItems.map(itemHtml).join('');
+  }
+  if(reserveItems.length){
+    html += `<div class="rec-mgroup">積立</div>`;
+    html += reserveItems.map(itemHtml).join('');
+  }
+
+  html += `<button class="report-btn" id="recpost-open-btn" onclick="openRecurringPostModal()" ${selCount?'':'disabled'} style="margin-top:10px">選択した項目を計上（${selCount}件）</button>`;
+  box.innerHTML = html;
+}
+
+function toggleRecurringCheck(recId){
+  if(recPostChecked.has(recId)) recPostChecked.delete(recId);
+  else recPostChecked.add(recId);
+  renderRecurringMonthly();
+}
+function toggleRecurringSelectAll(){
+  const unposted = recurring.filter(it => !isRecurringPosted(it.id, reportYear, reportMonth));
+  const allChecked = unposted.length > 0 && unposted.every(it => recPostChecked.has(it.id));
+  if(allChecked) recPostChecked.clear();
+  else unposted.forEach(it => recPostChecked.add(it.id));
+  renderRecurringMonthly();
+}
+
+function openRecurringPostModal(){
+  if(!recPostChecked.size) return;
+  const items = recurring.filter(it => recPostChecked.has(it.id));
+  document.getElementById('recpost-count').textContent = items.length;
+  document.getElementById('recpost-list').innerHTML = items.map(it => {
+    const name = it.kind==='fixed' ? (it.payee||'固定支出') : (it.memo||'積立');
+    return `<div style="display:flex;justify-content:space-between;padding:3px 0"><span>${name}</span><span>¥${fmt(it.amount)}</span></div>`;
+  }).join('');
+  // 計上日の初期値：対象月が今月なら今日、それ以外は対象月の1日
+  const d = now();
+  let initDate;
+  if(reportYear === d.getFullYear() && reportMonth === d.getMonth()+1){
+    initDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  } else {
+    initDate = `${reportYear}-${String(reportMonth).padStart(2,'0')}-01`;
+  }
+  document.getElementById('recpost-date').value = initDate;
+  document.getElementById('recpost-modal-overlay').style.display = 'flex';
+}
+function closeRecPostModal(e){
+  if(e && e.target !== document.getElementById('recpost-modal-overlay')) return;
+  document.getElementById('recpost-modal-overlay').style.display = 'none';
+}
+
+function confirmRecurringPost(){
+  const items = recurring.filter(it => recPostChecked.has(it.id));
+  if(!items.length){ closeRecPostModal(); return; }
+  const dateVal = document.getElementById('recpost-date').value;
+  const d = dateVal ? new Date(dateVal+'T00:00:00') : now();
+  const Y = d.getFullYear(), M = d.getMonth()+1, D = d.getDate();
+
+  let count = 0;
+  items.forEach(it => {
+    // 二重計上ガード（計上日の年月で判定）
+    if(isRecurringPosted(it.id, Y, M)) return;
+
+    if(it.kind === 'fixed'){
+      const tx = {
+        id: Date.now().toString(36)+Math.random().toString(36).slice(2),
+        walletName: it.fromWallet,
+        memo: it.payee || it.memo || '固定支出',
+        category: fixedPostCategory(it.payee),
+        amount: it.amount,
+        recurringId: it.id,
+        year: Y, month: M, day: D, ts: d.getTime()
+      };
+      history.push(tx);
+      count++;
+    } else {
+      // 積立：transferペア（移動元 → 積立先）
+      const pairId = Date.now().toString(36)+Math.random().toString(36).slice(2);
+      const txOut = {
+        id: pairId+'_out', type:'transfer', transferDir:'out',
+        transferPairId: pairId, transferPeerName: it.toWallet,
+        walletName: it.fromWallet,
+        memo: it.memo || '積立', amount: it.amount,
+        recurringId: it.id,
+        year: Y, month: M, day: D, ts: d.getTime()
+      };
+      const txIn = {
+        id: pairId+'_in', type:'transfer', transferDir:'in',
+        transferPairId: pairId, transferPeerName: it.fromWallet,
+        walletName: it.toWallet,
+        memo: it.memo || '積立', amount: it.amount,
+        recurringId: it.id,
+        year: Y, month: M, day: D, ts: d.getTime()
+      };
+      history.push(txOut, txIn);
+      count++;
+    }
+  });
+
+  LS.set(KEY_HISTORY, history);
+  recPostChecked.clear();
+  closeRecPostModal();
+  renderRecurringMonthly();
+  renderHome(); renderHistory();
+  showToast(`✓ ${count}件の定例項目を計上しました`);
 }
 
 // ════════════════════════════════
@@ -2529,6 +2768,7 @@ function changeReportMonth(delta){
   if(reportMonth > 12){ reportMonth=1; reportYear++; }
   if(reportMonth < 1) { reportMonth=12; reportYear--; }
   updateReportMonthLabel();
+  renderRecurringMonthly();
   document.getElementById('report-output').style.display='none';
   document.getElementById('report-btn').disabled=false;
 }
