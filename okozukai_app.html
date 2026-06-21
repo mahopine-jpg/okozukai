@@ -3127,27 +3127,50 @@ async function doRollover(){
 // ════════════════════════════════
 //  Export CSV
 // ════════════════════════════════
-function exportCSV(){
-  // 対象月の明細CSV
-  const target = ym(reportYear, reportMonth);
-  let csv = `\uFEFF${reportYear}年${reportMonth}月 おこづかい明細\n\n`;
-  csv += '口座名,予算,使用額,残高,使用率\n';
-  wallets.forEach(w => {
-    const spent = spentInMonth(w.name, reportYear, reportMonth);
-    const rem   = w.budget - spent;
-    const pct   = w.budget>0 ? Math.round(spent/w.budget*100) : 0;
-    csv += `${w.name},${w.budget},${spent},${rem},${pct}%\n`;
-  });
-  csv += '\n記帳履歴\n日付,口座,メモ,金額,種別\n';
+// CSVセル用エスケープ：カンマ・改行・引用符を含む値はダブルクォートで囲む
+function csvCell(v){
+  const s = (v===undefined || v===null) ? '' : String(v);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+}
+
+// 1レコードをDB形式の行配列[日付,年,月,口座,種別,カテゴリ,内容,金額,相手口座,定例]に変換
+function recordToRow(h){
+  const dateStr = `${h.year}-${String(h.month).padStart(2,'0')}-${String(h.day).padStart(2,'0')}`;
+  let kind = '', account = h.walletName || '', category = '', peer = '', sign = 0;
+  if(h.type === 'income'){
+    kind = '収入'; sign = h.amount;
+  } else if(h.type === 'transfer'){
+    if(h.transferDir === 'in'){ kind = '移動入'; sign = h.amount; }
+    else { kind = '移動出'; sign = -h.amount; }
+    peer = h.transferPeerName || '';
+  } else if(h.type === 'savings_withdraw'){
+    kind = '貯金引出'; account = '貯金口座'; sign = -h.amount;
+  } else if(h.type === 'savings_adjust'){
+    kind = '貯金調整'; account = '貯金口座';
+    sign = (h.adjustType === 'unknown') ? -h.amount : h.amount;
+  } else {
+    // type なし＝通常支出
+    kind = '支出'; category = h.category || ''; sign = -h.amount;
+  }
+  const recur = h.recurringId ? '✓' : '';
+  return [dateStr, h.year, h.month, account, kind, category, (h.memo||''), sign, peer, recur];
+}
+
+// 指定年月の明細をDB形式CSV文字列で組み立てる
+function buildDetailCSV(year, month){
+  const target = ym(year, month);
+  let csv = '\uFEFF日付,年,月,口座,種別,カテゴリ,内容,金額,相手口座,定例\n';
   history
-    .filter(h => ym(h.year,h.month)===target)
+    .filter(h => ym(h.year, h.month) === target)
     .sort((a,b)=> new Date(a.year,a.month-1,a.day) - new Date(b.year,b.month-1,b.day))
     .forEach(h => {
-      const kind = h.type==='transfer' ? (h.transferDir==='out'?`移動→${h.transferPeerName}`:`移動←${h.transferPeerName}`) : '支出';
-      const sign = (h.type==='transfer'&&h.transferDir==='in') ? h.amount : -h.amount;
-      csv += `${h.year}/${String(h.month).padStart(2,'0')}/${String(h.day).padStart(2,'0')},${h.walletName},${h.memo},${sign},${kind}\n`;
+      csv += recordToRow(h).map(csvCell).join(',') + '\n';
     });
+  return csv;
+}
 
+function exportCSV(){
+  const csv = buildDetailCSV(reportYear, reportMonth);
   downloadCSV(csv, `okozukai_detail_${reportYear}${String(reportMonth).padStart(2,'0')}.csv`);
   showToast('明細CSVを出力しました');
 }
