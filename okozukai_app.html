@@ -377,6 +377,7 @@ body {
 .rec-bar-wrap { height: 6px; background: var(--bg2); border-radius: 3px; overflow: hidden; margin-top: 7px; }
 .rec-bar-fill { height: 100%; background: var(--text); border-radius: 3px; }
 .rec-bar-label { font-size: 10px; font-weight: 700; color: var(--muted); margin-top: 3px; }
+.rec-bar-twin { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; color: var(--muted); margin-top: 4px; }
 .add-wallet-btn {
   width: 100%; background: none; border: 1.5px dashed var(--border2);
   border-radius: 10px; color: var(--muted); font-family: var(--sans);
@@ -713,7 +714,7 @@ body {
     <button class="add-wallet-btn" onclick="addWallet()">＋ 口座を追加</button>
     <button class="save-btn" id="save-wallets-btn" onclick="saveWallets()" disabled>口座設定を保存</button>
 
-    <div class="sec-label" style="margin-top:12px">固定費・連絡先設定</div>
+    <div class="sec-label" style="margin-top:12px">固定費</div>
     <div class="setting-card">
       <div class="setting-head">
         <div class="setting-head-title">固定費一覧</div>
@@ -722,13 +723,7 @@ body {
       <div id="fixed-settings"></div>
     </div>
     <button class="add-wallet-btn" onclick="addFixedItem()">＋ 固定費を追加</button>
-    <div class="setting-card" style="margin-top:8px">
-      <div class="api-row">
-        <div class="api-label">週次レポートの送り先メールアドレス</div>
-        <input type="email" class="inp-api" id="inp-email" placeholder="例：parent@example.com" oninput="markFixedDirty()" style="font-family:var(--sans)">
-      </div>
-    </div>
-    <button class="save-btn" id="save-fixed-btn" onclick="saveFixedSettings()" disabled>固定費・連絡先を保存</button>
+    <button class="save-btn" id="save-fixed-btn" onclick="saveFixedSettings()" disabled>固定費を保存</button>
 
     <div class="sec-label" style="margin-top:12px">定例項目（毎月の固定支出・積立）</div>
     <div class="setting-card">
@@ -747,7 +742,24 @@ body {
       <div id="recurring-reserve-settings"></div>
     </div>
     <button class="add-wallet-btn" onclick="addRecurringItem('reserve')">＋ 積立を追加</button>
+    <div class="setting-card" style="margin-top:8px">
+      <div class="setting-head">
+        <div class="setting-head-title">返済（借金・分割払いなど）</div>
+        <div class="setting-head-sub" style="font-size:12px">終わりがある支払い・総額あり</div>
+      </div>
+      <div id="recurring-debt-settings"></div>
+    </div>
+    <button class="add-wallet-btn" onclick="addRecurringItem('debt')">＋ 返済を追加</button>
     <button class="save-btn" id="save-recurring-btn" onclick="saveRecurring()" disabled>定例項目を保存</button>
+
+    <div class="sec-label" style="margin-top:12px">連絡先</div>
+    <div class="setting-card">
+      <div class="api-row">
+        <div class="api-label">週次レポートの送り先メールアドレス</div>
+        <input type="email" class="inp-api" id="inp-email" placeholder="例：parent@example.com" oninput="markEmailDirty()" style="font-family:var(--sans)">
+      </div>
+    </div>
+    <button class="save-btn" id="save-email-btn" onclick="saveEmail()" disabled>連絡先を保存</button>
 
     <div class="sec-label" style="margin-top:12px">Claude API キー</div>
     <div class="setting-card">
@@ -1562,6 +1574,64 @@ function deleteIncome(id, e){
 // ════════════════════════════════
 //  Settings
 // ════════════════════════════════
+// 画面上の未保存入力をデータ配列へ取り込む（追加・削除前に呼ぶ）
+function syncWalletsFromDOM(){
+  const rows = document.querySelectorAll('#wallet-settings .wallet-row');
+  if(!rows.length) return;
+  wallets = Array.from(rows).map(row => ({
+    name:   row.querySelector('.inp-name').value.trim() || '口座',
+    budget: parseInt(row.querySelector('.inp-budget').value) || 0
+  }));
+}
+function syncFixedFromDOM(){
+  const rows = document.querySelectorAll('#fixed-settings .wallet-row');
+  if(!rows.length) return;
+  const items = Array.from(rows).map(row => {
+    const name   = row.querySelector('.inp-name').value.trim() || '固定費';
+    const amount = parseInt(row.querySelector('.inp-budget').value) || 0;
+    return { id:name, name, amount };
+  });
+  fixedCosts = { items, email: fixedCosts.email || '' };
+}
+function syncRecurringFromDOM(){
+  const rows = document.querySelectorAll('#recurring-fixed-settings .recurring-row, #recurring-reserve-settings .recurring-row, #recurring-debt-settings .recurring-row');
+  if(!rows.length) return;
+  recurring = Array.from(rows).map(row => {
+    const i = parseInt(row.dataset.idx);
+    const base = recurring[i] || {};
+    const get = f => { const el = row.querySelector(`[data-field="${f}"]`); return el ? el.value : ''; };
+    if(base.kind === 'fixed'){
+      return {
+        id: base.id, kind:'fixed',
+        fromWallet: get('fromWallet'),
+        payee: get('payee').trim(),
+        amount: parseInt(get('amount')) || 0,
+        memo: get('memo').trim()
+      };
+    } else if(base.kind === 'debt'){
+      return {
+        id: base.id, kind:'debt',
+        fromWallet: get('fromWallet'),
+        payee: get('payee').trim(),
+        amount: parseInt(get('amount')) || 0,
+        memo: get('memo').trim(),
+        total: parseInt(get('total')) || '',
+        goalDate: get('goalDate') || ''
+      };
+    } else {
+      return {
+        id: base.id, kind:'reserve',
+        fromWallet: get('fromWallet'),
+        toWallet: get('toWallet'),
+        amount: parseInt(get('amount')) || 0,
+        memo: get('memo').trim(),
+        goal: parseInt(get('goal')) || '',
+        goalDate: get('goalDate') || ''
+      };
+    }
+  });
+}
+
 function renderSettings(){
   const c = document.getElementById('wallet-settings');
   c.innerHTML = '';
@@ -1612,16 +1682,30 @@ function saveFixedSettings(){
   });
   fixedCosts = {
     items,
-    email: document.getElementById('inp-email').value.trim()
+    email: fixedCosts.email || ''
   };
   LS.set(KEY_FIXED, fixedCosts);
   fixedDirty = false;
   document.getElementById('save-fixed-btn').disabled = true;
   populateCategorySelect();
-  showToast('✓ 固定費・連絡先を保存しました');
+  showToast('✓ 固定費を保存しました');
+}
+
+let emailDirty = false;
+function markEmailDirty(){
+  emailDirty = true;
+  document.getElementById('save-email-btn').disabled = false;
+}
+function saveEmail(){
+  fixedCosts.email = (document.getElementById('inp-email').value || '').trim();
+  LS.set(KEY_FIXED, fixedCosts);
+  emailDirty = false;
+  document.getElementById('save-email-btn').disabled = true;
+  showToast('✓ 連絡先を保存しました');
 }
 
 function addFixedItem(){
+  syncFixedFromDOM();
   fixedCosts.items.push({id:'new_'+Date.now(), name:'', amount:0});
   renderSettings();
   const inputs = document.querySelectorAll('#fixed-settings .inp-name');
@@ -1631,6 +1715,7 @@ function addFixedItem(){
 }
 
 function delFixedItem(i){
+  syncFixedFromDOM();
   const name = fixedCosts.items[i]?.name || '';
   if(name && !confirm(`「${name}」を削除しますか？`)) return;
   fixedCosts.items.splice(i, 1);
@@ -1652,9 +1737,11 @@ function walletOptionsHtml(selectedName){
 function renderRecurring(){
   const fc = document.getElementById('recurring-fixed-settings');
   const rc = document.getElementById('recurring-reserve-settings');
-  if(!fc || !rc) return;
+  const dc = document.getElementById('recurring-debt-settings');
+  if(!fc || !rc || !dc) return;
   fc.innerHTML = '';
   rc.innerHTML = '';
+  dc.innerHTML = '';
   recurring.forEach((it, i) => {
     const row = document.createElement('div');
     row.className = 'recurring-row';
@@ -1673,7 +1760,28 @@ function renderRecurring(){
           <button class="del-btn" onclick="delRecurringItem(${i})">×</button>
         </div>`;
       fc.appendChild(row);
-    } else {
+    } else if(it.kind === 'debt'){
+      row.innerHTML = `
+        <div class="rec-line">
+          <select class="rec-sel" oninput="markRecurringDirty()" data-field="fromWallet">${walletOptionsHtml(it.fromWallet)}</select>
+          <span class="rec-arrow">→</span>
+          <input class="rec-payee" type="text" value="${it.payee||''}" placeholder="支払先（返済先）" oninput="markRecurringDirty()" data-field="payee">
+        </div>
+        <div class="rec-line">
+          <span class="budget-yen">¥</span>
+          <input class="rec-amount" type="number" value="${it.amount||0}" placeholder="毎月の返済額" inputmode="numeric" oninput="markRecurringDirty()" data-field="amount">
+          <input class="rec-memo" type="text" value="${it.memo||''}" placeholder="備考メモ" oninput="markRecurringDirty()" data-field="memo">
+          <button class="del-btn" onclick="delRecurringItem(${i})">×</button>
+        </div>
+        <div class="rec-line">
+          <span class="rec-goal-label">総額</span>
+          <span class="budget-yen">¥</span>
+          <input class="rec-goal" type="number" value="${it.total||''}" placeholder="返済総額" inputmode="numeric" oninput="markRecurringDirty()" data-field="total">
+          <span class="rec-goal-label">完済</span>
+          <input class="rec-goaldate" type="date" value="${it.goalDate||''}" oninput="markRecurringDirty()" data-field="goalDate">
+        </div>`;
+      dc.appendChild(row);
+    } else if(it.kind === 'reserve'){
       row.innerHTML = `
         <div class="rec-line">
           <select class="rec-sel" oninput="markRecurringDirty()" data-field="fromWallet">${walletOptionsHtml(it.fromWallet)}</select>
@@ -1698,8 +1806,11 @@ function renderRecurring(){
   });
 }
 function addRecurringItem(kind){
+  syncRecurringFromDOM();
   if(kind === 'fixed'){
     recurring.push({ id:'r'+Date.now(), kind:'fixed', fromWallet:wallets[0]?.name||'', payee:'', amount:0, memo:'' });
+  } else if(kind === 'debt'){
+    recurring.push({ id:'r'+Date.now(), kind:'debt', fromWallet:wallets[0]?.name||'', payee:'', amount:0, memo:'', total:'', goalDate:'' });
   } else {
     recurring.push({ id:'r'+Date.now(), kind:'reserve', fromWallet:wallets[0]?.name||'', toWallet:wallets[1]?.name||wallets[0]?.name||'', amount:0, memo:'', goal:'', goalDate:'' });
   }
@@ -1707,15 +1818,16 @@ function addRecurringItem(kind){
   markRecurringDirty();
 }
 function delRecurringItem(i){
+  syncRecurringFromDOM();
   const it = recurring[i];
-  const label = it ? (it.kind==='fixed' ? (it.payee||'固定支出') : (it.memo||'積立')) : '';
+  const label = it ? (it.kind==='reserve' ? (it.memo||'積立') : (it.payee||(it.kind==='debt'?'返済':'固定支出'))) : '';
   if(label && !confirm(`「${label}」を削除しますか？`)) return;
   recurring.splice(i, 1);
   renderRecurring();
   markRecurringDirty();
 }
 function saveRecurring(){
-  const rows = document.querySelectorAll('#recurring-fixed-settings .recurring-row, #recurring-reserve-settings .recurring-row');
+  const rows = document.querySelectorAll('#recurring-fixed-settings .recurring-row, #recurring-reserve-settings .recurring-row, #recurring-debt-settings .recurring-row');
   const items = Array.from(rows).map(row => {
     const i = parseInt(row.dataset.idx);
     const base = recurring[i] || {};
@@ -1729,6 +1841,17 @@ function saveRecurring(){
         payee: get('payee').trim(),
         amount: parseInt(get('amount')) || 0,
         memo: get('memo').trim()
+      };
+    } else if(kind === 'debt'){
+      return {
+        id: base.id || 'r'+Date.now()+Math.random().toString(36).slice(2,5),
+        kind:'debt',
+        fromWallet: get('fromWallet'),
+        payee: get('payee').trim(),
+        amount: parseInt(get('amount')) || 0,
+        memo: get('memo').trim(),
+        total: parseInt(get('total')) || '',
+        goalDate: get('goalDate') || ''
       };
     } else {
       return {
@@ -1751,15 +1874,18 @@ function saveRecurring(){
 }
 
 function addWallet(){
-  wallets.push({name:'新しい口座', budget:10000});
+  syncWalletsFromDOM();
+  wallets.push({name:'新しい口座', budget:0});
   renderSettings();
-  const inputs = document.querySelectorAll('.inp-name');
+  markWalletsDirty();
+  const inputs = document.querySelectorAll('#wallet-settings .inp-name');
   const last = inputs[inputs.length-1];
-  last.focus(); last.select();
+  if(last){ last.focus(); last.select(); }
 }
 
 function delWalletRow(i){
   if(wallets.length<=1){ showToast('口座は1つ以上必要です'); return; }
+  syncWalletsFromDOM();
   const name = wallets[i].name;
   if(!confirm(`「${name}」を削除しますか？\n（記帳履歴は残ります）`)) return;
   wallets.splice(i,1);
@@ -1912,6 +2038,12 @@ function reserveAccumulated(recId){
     .filter(h => h.recurringId === recId && h.type === 'transfer' && h.transferDir === 'in')
     .reduce((s,h) => s + h.amount, 0);
 }
+// 固定支出（終わりがある支払い）の計上累計（recurringId 付きの支出を全期間合計）
+function fixedPaidAccumulated(recId){
+  return history
+    .filter(h => h.recurringId === recId && h.type !== 'transfer' && h.type !== 'income')
+    .reduce((s,h) => s + h.amount, 0);
+}
 // 固定支出のカテゴリ決定：支払先が固定費項目名と一致すれば固定費カテゴリ、なければ空欄
 function fixedPostCategory(payee){
   return fixedCategoryNames().includes(payee) ? payee : '';
@@ -1924,6 +2056,7 @@ function renderRecurringMonthly(){
 
   const y = reportYear, m = reportMonth;
   const fixedItems   = recurring.filter(it => it.kind === 'fixed');
+  const debtItems    = recurring.filter(it => it.kind === 'debt');
   const reserveItems = recurring.filter(it => it.kind === 'reserve');
 
   // 未計上のうちチェック対象を集計
@@ -1935,11 +2068,11 @@ function renderRecurringMonthly(){
   const itemHtml = (it) => {
     const posted  = isRecurringPosted(it.id, y, m);
     const checked = recPostChecked.has(it.id);
+    const left = posted
+      ? `<span class="rec-posted-badge">計上済</span>`
+      : `<input type="checkbox" class="rec-check" ${checked?'checked':''} onchange="toggleRecurringCheck('${it.id}')">`;
     if(it.kind === 'fixed'){
       const sub = `${it.fromWallet||'—'} → ${it.payee||'—'}`;
-      const left = posted
-        ? `<span class="rec-posted-badge">計上済</span>`
-        : `<input type="checkbox" class="rec-check" ${checked?'checked':''} onchange="toggleRecurringCheck('${it.id}')">`;
       return `<div class="rec-mrow${posted?' posted':''}">
         ${left}
         <div class="rec-mbody">
@@ -1947,6 +2080,29 @@ function renderRecurringMonthly(){
           <div class="rec-msub">${sub}</div>
         </div>
         <div class="rec-mamt${posted?' muted':''}">¥${fmt(it.amount)}</div>
+      </div>`;
+    } else if(it.kind === 'debt'){
+      const sub = `${it.fromWallet||'—'} → ${it.payee||'—'}`;
+      let bar = '';
+      if(it.total && it.total > 0){
+        const paid = fixedPaidAccumulated(it.id);
+        const remain = Math.max(0, it.total - paid);
+        const pct = Math.min(100, Math.round(paid / it.total * 100));
+        const remainTimes = it.amount > 0 ? Math.ceil(remain / it.amount) : 0;
+        const dateStr = it.goalDate ? `（${it.goalDate} 予定）` : '';
+        const timesStr = remain > 0 ? `完済まで あと${remainTimes}回${dateStr}` : '✓ 完済しました';
+        bar = `<div class="rec-bar-wrap"><div class="rec-bar-fill" style="width:${pct}%"></div></div>
+          <div class="rec-bar-twin"><span>返済済 ¥${fmt(paid)} / ¥${fmt(it.total)}</span><span>残り ¥${fmt(remain)}</span></div>
+          <div class="rec-bar-label">${timesStr}</div>`;
+      }
+      return `<div class="rec-mrow${posted?' posted':''}">
+        ${left}
+        <div class="rec-mbody">
+          <div class="rec-mtitle">${it.payee||'（返済先未設定）'}</div>
+          <div class="rec-msub">${sub}</div>
+          ${bar}
+        </div>
+        <div class="rec-mamt${posted?' muted':''}"${bar?' style="align-self:flex-start"':''}>¥${fmt(it.amount)}</div>
       </div>`;
     } else {
       const sub = `${it.fromWallet||'—'} → ${it.toWallet||'—'}`;
@@ -1958,9 +2114,6 @@ function renderRecurringMonthly(){
         bar = `<div class="rec-bar-wrap"><div class="rec-bar-fill" style="width:${pct}%"></div></div>
           <div class="rec-bar-label">¥${fmt(acc)} / ¥${fmt(it.goal)}（${pct}%）${dateStr}</div>`;
       }
-      const left = posted
-        ? `<span class="rec-posted-badge">計上済</span>`
-        : `<input type="checkbox" class="rec-check" ${checked?'checked':''} onchange="toggleRecurringCheck('${it.id}')">`;
       return `<div class="rec-mrow${posted?' posted':''}">
         ${left}
         <div class="rec-mbody">
@@ -1985,6 +2138,10 @@ function renderRecurringMonthly(){
   if(fixedItems.length){
     html += `<div class="rec-mgroup">固定支出</div>`;
     html += fixedItems.map(itemHtml).join('');
+  }
+  if(debtItems.length){
+    html += `<div class="rec-mgroup">返済</div>`;
+    html += debtItems.map(itemHtml).join('');
   }
   if(reserveItems.length){
     html += `<div class="rec-mgroup">積立</div>`;
@@ -2013,7 +2170,7 @@ function openRecurringPostModal(){
   const items = recurring.filter(it => recPostChecked.has(it.id));
   document.getElementById('recpost-count').textContent = items.length;
   document.getElementById('recpost-list').innerHTML = items.map(it => {
-    const name = it.kind==='fixed' ? (it.payee||'固定支出') : (it.memo||'積立');
+    const name = it.kind==='reserve' ? (it.memo||'積立') : (it.payee||(it.kind==='debt'?'返済':'固定支出'));
     return `<div style="display:flex;justify-content:space-between;padding:3px 0"><span>${name}</span><span>¥${fmt(it.amount)}</span></div>`;
   }).join('');
   // 計上日の初期値：対象月が今月なら今日、それ以外は対象月の1日
@@ -2044,11 +2201,11 @@ function confirmRecurringPost(){
     // 二重計上ガード（計上日の年月で判定）
     if(isRecurringPosted(it.id, Y, M)) return;
 
-    if(it.kind === 'fixed'){
+    if(it.kind === 'fixed' || it.kind === 'debt'){
       const tx = {
         id: Date.now().toString(36)+Math.random().toString(36).slice(2),
         walletName: it.fromWallet,
-        memo: it.payee || it.memo || '固定支出',
+        memo: it.payee || it.memo || (it.kind==='debt'?'返済':'固定支出'),
         category: fixedPostCategory(it.payee),
         amount: it.amount,
         recurringId: it.id,
