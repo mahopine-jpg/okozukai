@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>家計レポート</title>
+<title>wallet</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
@@ -937,57 +937,24 @@ const LS = {
   del: k => localStorage.removeItem(k)
 };
 
-const KEY_WALLETS  = 'kr_wallets';
-const KEY_HISTORY  = 'kr_history';
-const KEY_API      = 'kr_apikey';
-const KEY_SAVINGS  = 'kr_savings';
-const KEY_SUMMARY  = 'kr_summary';
-const KEY_WISHLIST = 'kr_wishlist';
-const KEY_FIXED    = 'kr_fixed';    // {items, email}
-const KEY_RECURRING= 'kr_recurring';// [{id,kind,fromWallet,toWallet,payee,amount,memo,goal,goalDate,total}]
+const KEY_WALLETS  = 'wlt_wallets';
+const KEY_HISTORY  = 'wlt_history';
+const KEY_API      = 'wlt_apikey';
+const KEY_SAVINGS  = 'wlt_savings';
+const KEY_SUMMARY  = 'wlt_summary';
+const KEY_WISHLIST = 'wlt_wishlist';
+const KEY_FIXED    = 'wlt_fixed';    // {gas, tobacco, email}
+const KEY_RECURRING= 'wlt_recurring';// [{id,kind,fromWallet,toWallet,payee,amount,memo,goal,goalDate}]
 
 // ════════════════════════════════
 //  State
 // ════════════════════════════════
-// ── 家計レポート 初期データ（正本：予算振り分けマスタv1／費目構造確定メモ）──
-// 一般口座欄は「器となる口座」だけ。積立・返済は定例項目側で扱う。初期残高はすべてゼロ。
-const DEFAULT_WALLETS = [
-  // おこづかい4口座（記帳時の使用元。budgetは予算枠の目安、残高はゼロから）
-  {name:'代表口座(デビット)', budget:0},
-  {name:'PayPay',           budget:0},
-  {name:'Suica',            budget:0},
-  {name:'財布(現金)',        budget:0},
-  // 繰越口座（グループB）
-  {name:'UFJ(通信費)',          budget:0},
-  {name:'SBI(司法書士プール)',   budget:0},
-  {name:'SBI(バイク整備)',       budget:0},
-  {name:'SBI(被服費)',          budget:0},
-  {name:'SBI(生活防衛資金)',     budget:0},
-  {name:'SBI(自由貯金)',         budget:0},
+let wallets = LS.get(KEY_WALLETS) || [
+  {name:'代表口座(デビット用)', budget:47500},
+  {name:'財布(現金)',           budget:0},
+  {name:'PayPay',              budget:0},
+  {name:'Suica',               budget:0},
 ];
-// 定例項目11件（固定支出1・返済2・積立8）。連番・金額はマスタv1準拠。累計/残高は運用開始時に実機で調整。
-const DEFAULT_RECURRING = [
-  {id:'rc1',  kind:'debt',    fromWallet:'代表口座(デビット)', payee:'司法書士(返済)', amount:35000, memo:'No.1 司法書士返済', total:165000, goalDate:''},
-  {id:'rc4',  kind:'debt',    fromWallet:'代表口座(デビット)', payee:'親(現金)',       amount:10000, memo:'No.4 借金返済(親へ)', total:270000, goalDate:''},
-  {id:'rc3',  kind:'fixed',   fromWallet:'代表口座(デビット)', payee:'母の口座',       amount:50000, memo:'No.3 家賃(親へ)'},
-  {id:'rc2',  kind:'reserve', fromWallet:'代表口座(デビット)', toWallet:'SBI(司法書士プール)', amount:15000, memo:'No.2 司法書士プール', goal:0,      goalDate:''},
-  {id:'rc5',  kind:'reserve', fromWallet:'代表口座(デビット)', toWallet:'UFJ(通信費)',         amount:2500,  memo:'No.5 通信費',        goal:0,      goalDate:''},
-  {id:'rc7',  kind:'reserve', fromWallet:'代表口座(デビット)', toWallet:'SBI(バイク保険)',     amount:3500,  memo:'No.7 バイク保険',    goal:61000,  goalDate:'2027-05-31'},
-  {id:'rc8',  kind:'reserve', fromWallet:'代表口座(デビット)', toWallet:'SBI(バイク点検)',     amount:10000, memo:'No.8 バイク点検',    goal:150000, goalDate:'2027-06-30'},
-  {id:'rc9',  kind:'reserve', fromWallet:'代表口座(デビット)', toWallet:'SBI(バイク整備)',     amount:3000,  memo:'No.9 バイク整備',    goal:0,      goalDate:''},
-  {id:'rc10', kind:'reserve', fromWallet:'代表口座(デビット)', toWallet:'SBI(被服費)',         amount:5000,  memo:'No.10 被服費',       goal:0,      goalDate:''},
-  {id:'rc11', kind:'reserve', fromWallet:'代表口座(デビット)', toWallet:'SBI(生活防衛資金)',   amount:10000, memo:'No.11 生活防衛資金', goal:0,      goalDate:''},
-  {id:'rc12', kind:'reserve', fromWallet:'代表口座(デビット)', toWallet:'SBI(ライフイベント)', amount:5000,  memo:'No.12 ライフイベント', goal:50000, goalDate:''},
-];
-// おこづかい内訳の固定費（No.6-1〜6-4）。自由費(6-5)は残り全部なので項目化しない。
-const DEFAULT_FIXED = { items:[
-  {id:'gas',     name:'ガソリン代', amount:8500},
-  {id:'tobacco', name:'タバコ代',   amount:8000},
-  {id:'pass',    name:'定期代',     amount:10000},
-  {id:'medical', name:'医療費',     amount:3500},
-], email:'' };
-
-let wallets = LS.get(KEY_WALLETS) || DEFAULT_WALLETS.map(w => ({...w}));
 let history = LS.get(KEY_HISTORY) || [];
 let savings = LS.get(KEY_SAVINGS) || 0;
 let monthlySummaries = LS.get(KEY_SUMMARY) || [];
@@ -995,7 +962,7 @@ let wishList = LS.get(KEY_WISHLIST) || [];
 // 旧フォーマット（{gas, tobacco, email}）→ 新フォーマット（{items, email}）の自動移行
 function loadFixedCosts(){
   const raw = LS.get(KEY_FIXED);
-  if(!raw) return { items: DEFAULT_FIXED.items.map(it => ({...it})), email:'' };
+  if(!raw) return { items:[{id:'gas',name:'ガソリン代',amount:8500},{id:'tobacco',name:'タバコ代',amount:8000},{id:'parking',name:'駐車場定期代',amount:10000}], email:'' };
   // 旧フォーマット判定
   if('gas' in raw || 'tobacco' in raw){
     const migrated = {
@@ -1014,7 +981,7 @@ function loadFixedCosts(){
 }
 let fixedCosts = loadFixedCosts();
 // 定例項目（固定支出 fixed / 積立 reserve）
-let recurring = LS.get(KEY_RECURRING) || DEFAULT_RECURRING.map(r => ({...r}));
+let recurring = LS.get(KEY_RECURRING) || [];
 
 // ── カテゴリ ──
 // 変動費カテゴリ（固定） + 固定費カテゴリ（固定費設定の項目名から動的生成）
@@ -2027,10 +1994,14 @@ function resetEverything(){
   if(!confirm('すべてのデータ（記帳履歴・貯金・月次サマリ・欲しいものリスト・口座設定・固定費・APIキー）を完全に削除します。\nデフォルトの状態に戻ります。\nよろしいですか？')) return;
   if(!confirm('本当に削除してよいですか？この操作は元に戻せません。')) return;
   localStorage.clear();
-  history=[]; savings=0; monthlySummaries=[]; wishList=[]; recurring=DEFAULT_RECURRING.map(r => ({...r}));
-  fixedCosts = { items: DEFAULT_FIXED.items.map(it => ({...it})), email:'' };
-  wallets = DEFAULT_WALLETS.map(w => ({...w}));
-  LS.set(KEY_RECURRING, recurring); LS.set(KEY_FIXED, fixedCosts); LS.set(KEY_WALLETS, wallets);
+  history=[]; savings=0; monthlySummaries=[]; wishList=[]; recurring=[];
+  fixedCosts = { items:[{id:'gas',name:'ガソリン代',amount:8500},{id:'tobacco',name:'タバコ代',amount:8000},{id:'parking',name:'駐車場定期代',amount:10000}], email:'' };
+  wallets = [
+    {name:'代表口座(デビット用)', budget:47500},
+    {name:'財布(現金)',           budget:0},
+    {name:'PayPay',              budget:0},
+    {name:'Suica',               budget:0},
+  ];
   renderHome(); renderHistory(); renderSummaryList(); renderSelect(); renderSettings();
   showToast('完全リセットしました');
 }
